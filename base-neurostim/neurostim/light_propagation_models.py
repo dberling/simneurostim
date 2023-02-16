@@ -417,7 +417,7 @@ def kubelka_LED_closeField(
 def gaussian(x, mu, sig):
     return (2*np.pi)**(-0.5) / abs(sig) * np.exp(- (x-mu)**2 / (2 * sig**2))
 
-def usp_model(r, z, r_sig, z_sig):
+def usp_model(power, r, z, r_sig, z_sig):
     """ 
     ultrasound emitter model based on experimental data from Cadoni et al. 2021 Fig. 1
 
@@ -425,15 +425,15 @@ def usp_model(r, z, r_sig, z_sig):
     r_sig = 0.5, z_sig = 10 gives approximate profile for 2.25 MHz
     r_sig = 0.1, z_sig = 2 gives approximate profile for 15 MHz
     """
-    return gaussian(r, mu=0, sig=r_sig) * gaussian(z,mu=0,sig=z_sig)
+    return power * gaussian(r, mu=0, sig=r_sig) * gaussian(z,mu=0,sig=z_sig)
 
 def usp_model_wrap(x,y,z, width, power, **kargs):
     if width == 2250:
         # set 2.25 MHz settings
         r_sig = 0.5
         z_sig = 10
-    elif width = 15000:
+    elif width == 15000:
         # set 15 MHz settings
         r_sig = 0.1
         z_sig = 2
-    return usp_model(r=np.sqrt(x**2+y**2), z=z, r_sig=r_sig, z_sig=z_sig)
+    return usp_model(power=power, r=np.sqrt(x**2+y**2), z=z, r_sig=r_sig, z_sig=z_sig)
