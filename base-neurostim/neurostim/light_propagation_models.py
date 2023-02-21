@@ -428,6 +428,13 @@ def usp_model(power, r, z, r_sig, z_sig):
     return power * gaussian(r, mu=0, sig=r_sig) * gaussian(z,mu=0,sig=z_sig)
 
 def usp_model_wrap(x,y,z, width, power, **kargs):
+    """
+    wrapper for usp_model to follow convention for light_propagation_model
+    x,y,z in um need to be converted to mm
+    """
+    x*=0.001
+    y*=0.001
+    z*=0.001
     if width == 2250:
         # set 2.25 MHz settings
         r_sig = 0.5
