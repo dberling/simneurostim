@@ -1,6 +1,5 @@
 from neuron import h
 import os
-#from optostim.utils import arbitrary_3d_rotation_along_axis
 from neurostim.utils import arbitrary_3d_rotation_along_axis
 import numpy as np
 
