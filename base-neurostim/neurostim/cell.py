@@ -129,6 +129,43 @@ class Cell:
         parentsegs = [sec.parentseg() for sec in h.soma.children()]
         return list(zip(soma_childsegs, parentsegs))
 
+    def _get_ChR_expression_level(self, distance_from_soma, distribution):
+        """
+        Defines expression distribution.
+        Derivation of expression distributions from data of 
+        Shemesh et al.(2017). Nature Neuroscience, 20(12), 1796–1806. 
+        https://doi.org/10.1038/s41593-017-0018-8
+
+        Derivation details in metadata/CoChR_expression_levels_Shemesh_et_al2021*.ipynb
+        *: _cultures
+           _slices
+
+        """
+        if distribution == "uniform":
+            return 1
+        elif distribution == "shemesh_fig1m_untrgtd":
+            b = 0.019
+            return np.exp(-b * (distance_from_soma))
+        elif distribution == "shemesh_fig1n_trgtd":
+            b = 0.110
+            return np.exp(-b * (distance_from_soma))
+        elif distribution == "shemesh_supfig9b_exp_yoff":
+            b = 0.09819018
+            y_off = 0.18541665
+            res_expr_level = (1-y_off) * np.exp(-b*distance_from_soma) + y_off
+            return (res_expr_level>0) * res_expr_level
+        elif distribution == "shemesh_supfig9b_exp_lin_yoff":
+            b = 0.12200734
+            m=0.00086746
+            y_off=0.25372033
+            res_expr_level = (1-y_off) * np.exp(-b*distance_from_soma) - m * distance_from_soma + y_off
+            return (res_expr_level>0) * res_expr_level
+        else:
+            raise ValueError(
+                "distribution must equal {'uniform', 'shemesh_fig1m_untrgtd', shemesh_fig1n_trgtd'}"
+            )
+            return None
+
     def _distribute_ChR_density(self, ChR_soma_density, distribution):
         """
         Distribute channelrhodopsin through the morphology matching density at soma
@@ -146,7 +183,7 @@ class Cell:
             if h.ismembrane("chanrhod", sec=sec):
                 for seg in sec:
                     distance_from_soma_center = h.distance(h.soma(0.5), seg)  # um
-                    seg.channel_density_chanrhod = ChR_soma_density * _get_ChR_expression_level(
+                    seg.channel_density_chanrhod = ChR_soma_density * self._get_ChR_expression_level(
                         distance_from_soma_center, distribution=distribution
                     )
         return None
@@ -176,42 +213,6 @@ class Cell:
                         channels += n
             return channels
 
-        def _get_ChR_expression_level(distance_from_soma, distribution):
-            """
-            Defines expression distribution.
-            Derivation of expression distributions from data of 
-            Shemesh et al.(2017). Nature Neuroscience, 20(12), 1796–1806. 
-            https://doi.org/10.1038/s41593-017-0018-8
-
-            Derivation details in metadata/CoChR_expression_levels_Shemesh_et_al2021*.ipynb
-            *: _cultures
-               _slices
-
-            """
-            if distribution == "uniform":
-                return 1
-            elif distribution == "shemesh_fig1m_untrgtd":
-                b = 0.019
-                return np.exp(-b * (distance_from_soma))
-            elif distribution == "shemesh_fig1n_trgtd":
-                b = 0.110
-                return np.exp(-b * (distance_from_soma))
-            elif distribution == "shemesh_supfig9b_exp_yoff":
-                b = 0.09819018
-                y_off = 0.18541665
-                res_expr_level = (1-y_off) * np.exp(-b*distance_from_soma) + y_off
-                return (res_expr_level>0) * res_expr_level
-            elif distribution == "shemesh_supfig9b_exp_lin_yoff":
-                b = 0.12200734
-                m=0.00086746
-                y_off=0.25372033
-                res_expr_level = (1-y_off) * np.exp(-b*distance_from_soma) - m * distance_from_soma + y_off
-                return (res_expr_level>0) * res_expr_level
-            else:
-                raise ValueError(
-                    "distribution must equal {'uniform', 'shemesh_fig1m_untrgtd', shemesh_fig1n_trgtd'}"
-                )
-                return None
 
         # get ChR expression level for each segment and count distributed channels
         distributed_channels = 0
@@ -219,7 +220,7 @@ class Cell:
             if h.ismembrane("chanrhod", sec=sec):
                 for seg in sec:
                     distance_from_soma_center = h.distance(h.soma(0.5), seg)  # um
-                    seg.channel_density_chanrhod = _get_ChR_expression_level(
+                    seg.channel_density_chanrhod = self._get_ChR_expression_level(
                         distance_from_soma_center, distribution=distribution
                     )
                     rho = seg.channel_density_chanrhod / 1e8  # 1/cm2 --> 1/um2
