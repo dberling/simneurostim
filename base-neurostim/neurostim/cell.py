@@ -59,7 +59,7 @@ class Cell:
         #self._distribute_ChR_channels(
         #    n_channels=n_ChR_channels, distribution=ChR_distribution
         #)
-        self._distribute_ChR_channels(
+        self._distribute_ChR_density(
             ChR_soma_density=ChR_soma_density, distribution=ChR_distribution
         )
         self._assign_pos_chanrhod()
