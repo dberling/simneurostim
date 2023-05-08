@@ -445,7 +445,7 @@ def usp_model_wrap(x,y,z, width, power, **kargs):
         z_sig = 2
     return usp_model(power=power, r=np.sqrt(x**2+y**2), z=z, r_sig=r_sig, z_sig=z_sig)
 
-def usp_real_model(x,y,z,power,interpolation_object,max_power_interpolated_data, **kargs):
+def usp_real_model(x,y,z,power,interpolation_object, **kargs):
     """
     x,y,z: coordinates in um
     power: pressure in MPa
@@ -455,4 +455,4 @@ def usp_real_model(x,y,z,power,interpolation_object,max_power_interpolated_data,
     max_power_interpolated_data: maximal power reached throughout cortical space in 
                                  interpolated data, is used to normalize.
     """
-    return power / max_power_interpolated_data * interpolation_object(z, np.sqrt(x**2 + y**2))
+    return power * interpolation_object([z, np.sqrt(x**2 + y**2)])

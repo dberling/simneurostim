@@ -32,6 +32,7 @@ class LightSource:
             n_alphas = int(1e6)
             alphas = np.linspace(0, np.pi / 2, n_alphas)
             self.intensity_angle_profile = f(alphas)
+            self.interp=None
         elif self.name == "yona_et_al2016":
             self.intensity_angle_profile = dict(
                     I=np.load("".join([
@@ -47,8 +48,40 @@ class LightSource:
                         str(NA),
                         ".npy"]))
             )
+            self.interp=None
+        elif self.name == "usp_real_model":
+            # use data from fig. 1e in Cadoni et al. 2023, Nat Nanotech
+            # to create usp model based on interpolation
+            from scipy.interpolate import RegularGridInterpolator as rgi
+            # Using the csv data published with the paper online
+            # extracting xy values
+            xy = pd.read_csv('Cadoni_fig1_data/Fig1e.csv', 
+                    skiprows=0,nrows=1, sep=';', decimal=',')
+            xy = xy.values[0][3:562].astype(float)
+            # extract z values
+            z = pd.read_csv('Cadoni_fig1_data/Fig1e.csv', 
+                    skiprows=2,nrows=1, sep=';', decimal=',')
+            z = z.values[0][3:2003].astype(float)
+            usp_15MHz = pd.read_csv('Cadoni_fig1_data/Fig1e.csv', 
+                    skiprows=4,nrows=2000, sep=';',decimal=',')
+            usp_15MHz_data = usp_15MHz.iloc[:,:559].values
+            # convert xy and z from mm to um
+            xy *= 1000
+            z *= 1000
+            # normalized usp_15MHz_data
+            usp_15MHz_data /= np.nanmax(usp_15MHz_data)
+            self.interp = rgi(points=(z, xy), values=usp_15MHz_data, 
+                    fill_value=0, bounds_error=False)
+            self.intensity_angle_profile = None
         else:
             self.intensity_angle_profile = None
+            self.interp=None
+
+    def return_interp(self):
+        """
+        Utility to bug-fix the interpolation object
+        """
+        return self.interp
 
     def calculate_Tx_at_pos(self, xyz):
         """Compute transfer (dampening) factor of the light
@@ -62,9 +95,11 @@ class LightSource:
         """
         xyz = [target - source for target, source in zip(xyz, self.position)]
         Tx = self.light_propagation(
-            *xyz, self.width, power=1, intensity_profile=self.intensity_angle_profile, NA=self.NA
+            *xyz, width=self.width, power=1, 
+            intensity_profile=self.intensity_angle_profile, NA=self.NA,
+            interpolation_object=self.interp
         )
-        return Tx
+        return Tx[0]
 
 class LightStimulation:
     def __init__(self, cell, light_source, delay, duration, light_power, record_all_segments):
