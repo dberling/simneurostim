@@ -2,6 +2,8 @@ from neuron import h
 import numpy as np
 import neurostim.light_propagation_models as light_propagation_models
 from scipy.interpolate import interp1d
+from neurostim.utils import interpolate
+from neurostim.polarmaps import get_AP_times
 import pandas as pd
 
 
@@ -280,3 +282,67 @@ class LightStimulation:
         """
         meas_dict = self.simulate_and_measure(tot_rec_time)
         return self.get_currents_components_into_soma(meas_dict)
+
+def simulate_stimulation(
+    cell,
+    stim_source, stim_power, stim_duration, stim_delay,
+    diameter, NA,
+    stim_source_position,
+    extra_rec_var_names=None,
+    extra_rec_var_pointers=None,
+    interpol_dt=0.1,
+    AP_threshold=0
+):
+    """
+    Convenience function to run simulation.
+
+    extra_rec_var_names: list of str, 'all', or None (default)
+        Names of additional recording variables
+    extra_rec_var_pointers: list of str
+        Neuron pointers to extra recordings variables, e.g., h.soma(0.5)._ref_icat_chanrhod
+    """
+    if extra_rec_var_names == 'all':
+        record_all_segments = True
+    else:
+        record_all_segments = False
+    # stim source initialization
+    StimSource = LightSource(
+        model=str(stim_source),
+        position=stim_source_position,
+        width=diameter,
+        NA=NA
+    )
+    # stimulation object initialization
+    Stimulation = LightStimulation(
+        cell=cell,
+        light_source=StimSource,
+        delay=stim_delay,
+        duration=stim_duration,
+        light_power=stim_power,
+        record_all_segments=record_all_segments,
+    )
+    # simulate
+    measurement = pd.DataFrame(
+        Stimulation.simulate_and_measure(
+            tot_rec_time=stim_delay+stim_duration+10,
+            extra_rec_var_names=extra_rec_var_names,
+            extra_rec_var_pointers=extra_rec_var_pointers
+        )
+    )
+    # dealing with drop full row duplicates
+    # drop completely redundant duplicates
+    measurement = measurement.drop_duplicates()
+    # add 1e-12 ms to 2nd entry time point of duplicate entries with the same time but different (e.g. Vm) values
+    measurement.loc[measurement["time [ms]"].diff() == 0, "time [ms]"] += 1e-12
+    # interpolate simulation results
+    measurement = interpolate(
+        df=measurement, interpolation_dt=interpol_dt
+    )
+    # extract spike times
+    AP_times = get_AP_times(
+        df=measurement,
+        interpol_dt=float(interpol_dt),
+        t_on=float(stim_delay),
+        AP_threshold=AP_threshold
+    )
+    return measurement, AP_times
