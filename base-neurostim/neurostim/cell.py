@@ -1,6 +1,5 @@
 from neuron import h
 import os
-#from optostim.utils import arbitrary_3d_rotation_along_axis
 from neurostim.utils import arbitrary_3d_rotation_along_axis
 import numpy as np
 
@@ -16,7 +15,8 @@ class Cell:
         self,
         hoc_file,
         cortical_depth=None,
-        n_ChR_channels=10354945,
+        #n_ChR_channels=10354945,
+        ChR_soma_density=13e9,
         ChR_distribution="uniform",
         rm_mech_from_secs=None,
         delete_all_secs_except_soma=False
@@ -29,6 +29,8 @@ class Cell:
             name of hoc file from which cell is loaded
         cortical_depth: dict
             Dictionary with name of cell ('L23' or 'L5') and corresponding depth of soma in cortical column measured from the surface
+        ChR_soma_density: float
+            ChR density in soma in 1/cm2, Foutz et al use 13e9 /cm2
         n_ChR_channels: int
             Number of ChR2 channels distributed over the neuron, default value is the number of channels distributed in the L5 cell from Foutz et al 2012 in the condition of a uniform ChR density of 13000000000 channels 1/cm2
         ChR_distribution: {'uniform', 'shemesh_fig1m_untrgtd', shemesh_fig1n_trgtd'}
@@ -54,8 +56,11 @@ class Cell:
         self._construct_cell(hoc_file)
         self._rotate_in_vertical_position()
         self._move_to_cortical_position(cortical_depth)
-        self._distribute_ChR_channels(
-            n_channels=n_ChR_channels, distribution=ChR_distribution
+        #self._distribute_ChR_channels(
+        #    n_channels=n_ChR_channels, distribution=ChR_distribution
+        #)
+        self._distribute_ChR_density(
+            ChR_soma_density=ChR_soma_density, distribution=ChR_distribution
         )
         self._assign_pos_chanrhod()
         self.segs_coord = self.get_segs_coord_dict()
@@ -124,9 +129,69 @@ class Cell:
         parentsegs = [sec.parentseg() for sec in h.soma.children()]
         return list(zip(soma_childsegs, parentsegs))
 
+    def _get_ChR_expression_level(self, distance_from_soma, distribution):
+        """
+        Defines expression distribution.
+        Derivation of expression distributions from data of 
+        Shemesh et al.(2017). Nature Neuroscience, 20(12), 1796–1806. 
+        https://doi.org/10.1038/s41593-017-0018-8
+
+        Derivation details in metadata/CoChR_expression_levels_Shemesh_et_al2021*.ipynb
+        *: _cultures
+           _slices
+
+        """
+        if distribution == "uniform":
+            return 1
+        elif distribution == "shemesh_fig1m_untrgtd":
+            b = 0.019
+            return np.exp(-b * (distance_from_soma))
+        elif distribution == "shemesh_fig1n_trgtd":
+            b = 0.110
+            return np.exp(-b * (distance_from_soma))
+        elif distribution == "shemesh_supfig9b_exp_yoff":
+            b = 0.09819018
+            y_off = 0.18541665
+            res_expr_level = (1-y_off) * np.exp(-b*distance_from_soma) + y_off
+            return (res_expr_level>0) * res_expr_level
+        elif distribution == "shemesh_supfig9b_exp_lin_yoff":
+            b = 0.12200734
+            m=0.00086746
+            y_off=0.25372033
+            res_expr_level = (1-y_off) * np.exp(-b*distance_from_soma) - m * distance_from_soma + y_off
+            return (res_expr_level>0) * res_expr_level
+        else:
+            raise ValueError(
+                "distribution must equal {'uniform', 'shemesh_fig1m_untrgtd', shemesh_fig1n_trgtd'}"
+            )
+            return None
+
+    def _distribute_ChR_density(self, ChR_soma_density, distribution):
+        """
+        Distribute channelrhodopsin through the morphology matching density at soma
+
+        Params:
+        -------
+
+        ChR_density: float
+            surface density of ChR in 1/cm2, Foutz et al. 2012 used 13e9 1/cm2
+        distribution: {'uniform','shemesh_supfig9b_exp_yoff','shemesh_supfig9b_exp_lin_yoff'}
+            derivation in 'metadata/CoChR_expression_levels_Shemesh_et_al2021.ipynb'.
+                     
+        """
+        for sec in h.allsec():
+            if h.ismembrane("chanrhod", sec=sec):
+                for seg in sec:
+                    distance_from_soma_center = h.distance(h.soma(0.5), seg)  # um
+                    seg.channel_density_chanrhod = ChR_soma_density * self._get_ChR_expression_level(
+                        distance_from_soma_center, distribution=distribution
+                    )
+        return None
+
+
     def _distribute_ChR_channels(self, n_channels, distribution):
         """
-        Distribute channelrhodopsin throughout the morphology.
+        Distribute channelrhodopsin throughout the morphology matching channels in the cell
 
         Parameters:
         -----------
@@ -134,17 +199,9 @@ class Cell:
         n_ChR_channels: int
             number of ChR2 channels to distribute
 
-        distribution: {'uniform', 'shemesh_fig1m_untrgtd', shemesh_fig1n_trgtd'}
-            distribution of channels throughout the morphology. The last two
-            options are based on fits to Fig 1 m and n in Shemesh et al 2021.
-            They represent the distribution of CoChR untargeted and soma-targeted
-            respectively and are derived from GFP brightness. All this based on
-            cultured mouse hippocampal neurons. The here utilized fits to this
-            data can be found in
-            'metadata/CoChR_expression_levels_Shemesh_et_al2021.ipynb'.
-
+        distribution: {'uniform','shemesh_supfig9b_exp_yoff','shemesh_supfig9b_exp_lin_yoff'}
+            derivation in 'metadata/CoChR_expression_levels_Shemesh_et_al2021*.ipynb'.
         """
-
         def _get_ChR_channels_in_list(seclist):
             channels = 0
             for sec in seclist:
@@ -156,42 +213,6 @@ class Cell:
                         channels += n
             return channels
 
-        def _get_ChR_expression_level(distance_from_soma):
-            """
-            Defines expression distribution.
-            Derivation of expression distributions from data of 
-            Shemesh et al.(2017). Nature Neuroscience, 20(12), 1796–1806. 
-            https://doi.org/10.1038/s41593-017-0018-8
-
-            Derivation details in metadata/CoChR_expression_levels_Shemesh_et_al2021*.ipynb
-            *: _cultures
-               _slices
-
-            """
-            if distribution == "uniform":
-                return 1
-            elif distribution == "shemesh_fig1m_untrgtd":
-                b = 0.019
-                return np.exp(-b * (distance_from_soma))
-            elif distribution == "shemesh_fig1n_trgtd":
-                b = 0.110
-                return np.exp(-b * (distance_from_soma))
-            elif distribution == "shemesh_supfig9b_exp_yoff":
-                b = 0.09819018
-                y_off = 0.18541665
-                res_expr_level = (1-y_off) * np.exp(-b*distance_from_soma) + y_off
-                return (res_expr_level>0) * res_expr_level
-            elif distribution == "shemesh_supfig9b_exp_lin_yoff":
-                b = 0.12200734
-                m=0.00086746
-                y_off=0.25372033
-                res_expr_level = (1-y_off) * np.exp(-b*distance_from_soma) - m * distance_from_soma + y_off
-                return (res_expr_level>0) * res_expr_level
-            else:
-                raise ValueError(
-                    "distribution must equal {'uniform', 'shemesh_fig1m_untrgtd', shemesh_fig1n_trgtd'}"
-                )
-                return None
 
         # get ChR expression level for each segment and count distributed channels
         distributed_channels = 0
@@ -199,8 +220,8 @@ class Cell:
             if h.ismembrane("chanrhod", sec=sec):
                 for seg in sec:
                     distance_from_soma_center = h.distance(h.soma(0.5), seg)  # um
-                    seg.channel_density_chanrhod = _get_ChR_expression_level(
-                        distance_from_soma_center
+                    seg.channel_density_chanrhod = self._get_ChR_expression_level(
+                        distance_from_soma_center, distribution=distribution
                     )
                     rho = seg.channel_density_chanrhod / 1e8  # 1/cm2 --> 1/um2
                     area = h.area(seg.x, sec=sec)  # um2
