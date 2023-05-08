@@ -52,7 +52,7 @@ def unique_param_str(keys_in_order, params=None):
 def interpolate(df, interpolation_dt):
     time = np.arange(df["time [ms]"].min(), df["time [ms]"].max(), interpolation_dt)
     df_int = pd.DataFrame({})
-    for name, values in df.iteritems():
+    for name, values in df.items():
         f = interp1d(df["time [ms]"], values)
         df_int[name] = f(time)
     return df_int
