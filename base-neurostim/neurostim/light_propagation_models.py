@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import griddata
 
-
 def cylindric(x, y, z, width, power, **kargs):
     """
     Cylindrical light in z direction.
@@ -414,3 +413,34 @@ def kubelka_LED_closeField(
         Kx = 1
 
     return power * spread(r, z) * Lx * Kx
+
+def gaussian(x, mu, sig):
+    return (2*np.pi)**(-0.5) / abs(sig) * np.exp(- (x-mu)**2 / (2 * sig**2))
+
+def usp_model(power, r, z, r_sig, z_sig):
+    """ 
+    ultrasound emitter model based on experimental data from Cadoni et al. 2021 Fig. 1
+
+    Models ultrasound profile which is elliptic as product of gaussians.
+    r_sig = 0.5, z_sig = 10 gives approximate profile for 2.25 MHz
+    r_sig = 0.1, z_sig = 2 gives approximate profile for 15 MHz
+    """
+    return power * gaussian(r, mu=0, sig=r_sig) * gaussian(z,mu=0,sig=z_sig)
+
+def usp_model_wrap(x,y,z, width, power, **kargs):
+    """
+    wrapper for usp_model to follow convention for light_propagation_model
+    x,y,z in um need to be converted to mm
+    """
+    x*=0.001
+    y*=0.001
+    z*=0.001
+    if width == 2250:
+        # set 2.25 MHz settings
+        r_sig = 0.5
+        z_sig = 10
+    elif width == 15000:
+        # set 15 MHz settings
+        r_sig = 0.1
+        z_sig = 2
+    return usp_model(power=power, r=np.sqrt(x**2+y**2), z=z, r_sig=r_sig, z_sig=z_sig)
