@@ -583,7 +583,8 @@ class Cell:
     def plot_foutz2012(
             self, func, axes='xz', scaling = 1, segfunc=False, 
             clim=None,cmap=None,lognorm=False,color=None, 
-            shift_x=0, shift_y=0, shift_z=0, multiply_x=1, multiply_y=1, multiply_z=1, reverse_draw_order=False): 
+            shift_x=0, shift_y=0, shift_z=0, multiply_x=1, multiply_y=1, multiply_z=1, 
+            reverse_draw_order=False, alpha=None): 
         """ plot cell in matplotlib line plot collection
         """
         from numpy import array, linspace
@@ -622,6 +623,8 @@ class Cell:
                     raise TypeError
         if color:
             colors=color
+        if alpha == None:
+            alpha = 1    
         # Define line segments
         segments = []
         for edge in edges:
@@ -629,7 +632,7 @@ class Cell:
         # Build Line Collection
         collection = LineCollection(segments = array(segments),
                                     linewidths = diam*scaling,
-                                    colors=colors, norm=norm)
+                                    colors=colors, norm=norm, alpha=alpha)
         if reverse_draw_order:
             # Build Line Collection reversely
             collection = LineCollection(segments = array(segments)[::-1],
