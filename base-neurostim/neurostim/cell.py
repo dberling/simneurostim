@@ -49,6 +49,7 @@ class Cell:
             "L23somaWithoutNa.hoc",
             "L23WithoutNa.hoc",
             "L23WithoutNaAtSoma.hoc",
+            "L4.hoc",
             "L5.hoc",
             "L5_noNa_in_soma.hoc",
         ]
@@ -300,6 +301,9 @@ class Cell:
         if "L23" in self.hoc_file:
             axis = "x"
             angle = np.pi / 2
+        if "L4" in self.hoc_file:
+            axis = "x"
+            angle = np.pi / 2
         if "L5" in self.hoc_file:
             axis = "y"
             angle = np.pi / 2
@@ -316,6 +320,8 @@ class Cell:
         if cortical_depth == None:
             if "L23" in self.hoc_file:
                 self.cortical_depth = 400
+            if "L4" in self.hoc_file:
+                self.cortical_depth = 790
             if "L5" in self.hoc_file:
                 self.cortical_depth = 1150
             print(
@@ -325,6 +331,8 @@ class Cell:
         else:
             if "L23" in self.hoc_file:
                 self.cortical_depth = cortical_depth["L23"]
+            if "L4" in self.hoc_file:
+                self.cortical_depth = cortical_depth["L4"]
             if "L5" in self.hoc_file:
                 self.cortical_depth = cortical_depth["L5"]
         for sec in h.allsec():
