@@ -47,7 +47,7 @@ def generate_df(inputfiles, t_on, t_off, interpol_dt):
     return pd.DataFrame(all_data)
 
 
-def get_AP_times(df, interpol_dt, t_on, AP_threshold=None):
+def get_AP_times(df, interpol_dt, t_on, AP_threshold=None, apply_to="V_soma(0.5)"):
     """
     Find number of action potentials (APs)
 
@@ -59,7 +59,7 @@ def get_AP_times(df, interpol_dt, t_on, AP_threshold=None):
     n_points_1ms = int(1 / interpol_dt)
     peak_times = df.loc[
         argrelextrema(
-            df["V_soma(0.5)"].values, 
+            df[apply_to].values, 
             np.greater_equal, 
             order=n_points_1ms)
     ]["time [ms]"]
@@ -68,7 +68,7 @@ def get_AP_times(df, interpol_dt, t_on, AP_threshold=None):
     # elimante all below threshold
     if AP_threshold != None:
         peak_values = np.array(
-            [df.loc[df['time [ms]'] == time]['V_soma(0.5)'].values[0] for time in peak_times]
+            [df.loc[df['time [ms]'] == time][apply_to].values[0] for time in peak_times]
         )
         peak_times = peak_times[peak_values > AP_threshold]
     return peak_times
