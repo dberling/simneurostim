@@ -1,3 +1,5 @@
+import subprocess
+import neuron
 from neuron import h
 import os
 from neurostim.utils import arbitrary_3d_rotation_along_axis
@@ -13,7 +15,8 @@ def rm_mech(mech, sec):
 class Cell:
     def __init__(
         self,
-        hoc_file,
+        hoc_file=None,
+        cell_model=None,
         cortical_depth=None,
         #n_ChR_channels=10354945,
         ChR_soma_density=13e9,
@@ -40,20 +43,9 @@ class Cell:
 
         """
         self.hoc_file = hoc_file
-        allowed_hoc = [
-            "L23.hoc",
-            "L23_noNa_in_soma.hoc",
-            "L23OnlyChR2.hoc",
-            "L23soma.hoc",
-            "L23somaOnlyChR2.hoc",
-            "L23somaWithoutNa.hoc",
-            "L23WithoutNa.hoc",
-            "L23WithoutNaAtSoma.hoc",
-            "L5.hoc",
-            "L5_noNa_in_soma.hoc",
-        ]
-        self.allowed_hoc_files = [os.path.join("simneurostim/model", "hoc", h) for h in allowed_hoc]
-        self._construct_cell(hoc_file)
+        self.cell_model = cell_model
+        #self._compile_biophys_mechanisms(hoc_file, cell_model)
+        self._construct_cell(hoc_file, cell_model)
         self._rotate_in_vertical_position()
         self._move_to_cortical_position(cortical_depth)
         #self._distribute_ChR_channels(
@@ -64,13 +56,10 @@ class Cell:
         )
         self._assign_pos_chanrhod()
         self.segs_coord = self.get_segs_coord_dict()
-        # self.dendrites = [
-        #     s for s in h.allsec() if s.name() not in ["soma", "Soma", "SOMA"]
-        # ]
         if delete_all_secs_except_soma:
             # delete all sections except of soma
             for sec in list(h.allsec()):
-                if sec !=h.soma:
+                if sec !=self.soma_sec:
                     h.delete_section(sec=sec)
         self.soma_child_relations = self._get_soma_child_relations()
 
@@ -79,8 +68,51 @@ class Cell:
                 for sec in rm_mech_from_secs[1]:
                     rm_mech(mech, eval(sec))
 
-    def _construct_cell(self, hoc_file):
-        h.load_file(hoc_file)
+    def _compile_biophys_mechanisms(self, hoc_file, cell_model):
+        if hoc_file != None:
+            print("Load mechanisms from Foutz_et_al2012")
+            try:
+                n = subprocess.Popen(
+                        ['nrnivmodl'], 
+                        cwd="simneurostim/model/mod/Foutz2012",
+                        stdout=subprocess.PIPE, 
+                        stderr=subprocess.PIPE
+                )
+                n.wait()
+                neuron.load_mechanisms("simneurostim/model/mod/Foutz2012")
+                print('NEURON mechanisms loaded')
+            except RuntimeError:
+                print('RunTimeError: Pass as probably caused by reloading of previously loaded mechanisms. Terminate if not sure.')
+                pass
+
+        if cell_model != None:
+            print("Load mechanisms from Weise_et_al2023")
+            try:
+                n = subprocess.Popen(
+                        ['nrnivmodl'], 
+                        cwd="simneurostim/model/mod/WeiseWorps2023",
+                        stdout=subprocess.PIPE, 
+                        stderr=subprocess.PIPE
+                )
+                n.wait()
+                neuron.load_mechanisms("simneurostim/model/mod/WeiseWorps2023")
+                print('NEURON mechanisms loaded')
+            except RuntimeError:
+                print('RunTimeError: Pass as probably caused by reloading of previously loaded mechanisms. Terminate if not sure.')
+                pass
+
+    def _construct_cell(self, hoc_file, cell_model):
+        if hoc_file != None:
+            h.load_file(hoc_file)
+            print("loaded "+hoc_file)
+            self.soma_sec = h.soma
+        elif cell_model != None:
+            cell_model.load()
+            for sec in h.allsec():
+                # insert ChR mechanism into all sections
+                sec.insert("chanrhod")
+            assert len(cell_model.soma)==1, "cell has several soma sections, but loading via cell_model requires 1 soma section only"
+            self.soma_sec = cell_model.soma[0]
 
     def _assign_pos_chanrhod(self):
         """Assign x, y, and z chanrhod to neuron section"""
@@ -122,11 +154,8 @@ class Cell:
             array of tuples: children segs on 1st pos, corresponding
                              soma segs on 2nd positon
         """
-        assert (
-            h.soma in h.allsec()
-        ), "Construct cell before requesting children and soma relationships."
-        soma_childsegs = [sec(0.001) for sec in h.soma.children()]
-        parentsegs = [sec.parentseg() for sec in h.soma.children()]
+        soma_childsegs = [sec(0.001) for sec in self.soma_sec.children()]
+        parentsegs = [sec.parentseg() for sec in self.soma_sec.children()]
         return list(zip(soma_childsegs, parentsegs))
 
     def _get_ChR_expression_level(self, distance_from_soma, distribution):
@@ -182,7 +211,7 @@ class Cell:
         for sec in h.allsec():
             if h.ismembrane("chanrhod", sec=sec):
                 for seg in sec:
-                    distance_from_soma_center = h.distance(h.soma(0.5), seg)  # um
+                    distance_from_soma_center = h.distance(self.soma_sec(0.5), seg)  # um
                     seg.channel_density_chanrhod = ChR_soma_density * self._get_ChR_expression_level(
                         distance_from_soma_center, distribution=distribution
                     )
@@ -219,7 +248,7 @@ class Cell:
         for sec in h.allsec():
             if h.ismembrane("chanrhod", sec=sec):
                 for seg in sec:
-                    distance_from_soma_center = h.distance(h.soma(0.5), seg)  # um
+                    distance_from_soma_center = h.distance(self.soma_sec(0.5), seg)  # um
                     seg.channel_density_chanrhod = self._get_ChR_expression_level(
                         distance_from_soma_center, distribution=distribution
                     )
@@ -255,8 +284,8 @@ class Cell:
         var_names = ["time [ms]", "V_soma(0.5)", "i_ChR2_soma(0.5)"]
         var_pointers = [
             h._ref_t,
-            h.soma(0.5)._ref_v,
-            h.soma(0.5)._ref_i_chanrhod_chanrhod,
+            self.soma_sec(0.5)._ref_v,
+            self.soma_sec(0.5)._ref_i_chanrhod_chanrhod,
         ]
         if record_all_segments:
             for sec in h.allsec():
@@ -294,25 +323,26 @@ class Cell:
 
     def _rotate_in_vertical_position(self):
         """Rotate cell so that z is the vertical axis"""
-        assert (
-            self.hoc_file in self.allowed_hoc_files
-        ), "hoc file not in the list of the allowed ones"
-        if "L23" in self.hoc_file:
-            axis = "x"
-            angle = np.pi / 2
-        if "L5" in self.hoc_file:
-            axis = "y"
-            angle = np.pi / 2
-        for sec in h.allsec():
-            for i in range(sec.n3d()):
-                pos = [sec.x3d(i), sec.y3d(i), sec.z3d(i)]
-                rot_pos = arbitrary_3d_rotation_along_axis(pos, axis, angle)
-                h.pt3dchange(i, *rot_pos, sec.diam3d(i), sec=sec)
+        rotate=False
+        if self.hoc_file != None:
+            if "L23" in self.hoc_file:
+                axis = "x"
+                angle = np.pi / 2
+                print("rotate cell by "+str(angle)+" around "+axis)
+                rotate=True
+            if "L5" in self.hoc_file:
+                axis = "y"
+                angle = np.pi / 2
+                print("rotate cell by "+str(angle)+" around "+axis)
+                rotate=True
+        if rotate:
+            for sec in h.allsec():
+                for i in range(sec.n3d()):
+                    pos = [sec.x3d(i), sec.y3d(i), sec.z3d(i)]
+                    rot_pos = arbitrary_3d_rotation_along_axis(pos, axis, angle)
+                    h.pt3dchange(i, *rot_pos, sec.diam3d(i), sec=sec)
 
     def _move_to_cortical_position(self, cortical_depth):
-        assert (
-            self.hoc_file in self.allowed_hoc_files
-        ), "hoc file not in the list of the allowed ones"
         if cortical_depth == None:
             if "L23" in self.hoc_file:
                 self.cortical_depth = 400
@@ -323,10 +353,13 @@ class Cell:
                 % self.cortical_depth
             )
         else:
-            if "L23" in self.hoc_file:
-                self.cortical_depth = cortical_depth["L23"]
-            if "L5" in self.hoc_file:
-                self.cortical_depth = cortical_depth["L5"]
+            if self.hoc_file != None:
+                if "L23" in self.hoc_file:
+                    self.cortical_depth = cortical_depth["L23"]
+                if "L5" in self.hoc_file:
+                    self.cortical_depth = cortical_depth["L5"]
+            if self.cell_model != None:
+                self.cortical_depth = cortical_depth[str(self.cell_model)]
         for sec in h.allsec():
             for i in range(sec.n3d()):
                 cortex_pos = [sec.x3d(i), sec.y3d(i), sec.z3d(i) - self.cortical_depth]
