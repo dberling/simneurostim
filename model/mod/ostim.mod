@@ -1,21 +1,16 @@
 : test units: modlunit ostim.mod
 
 : changes by David Berling to file as published by Foutz et al. (2012):
-: - use amp parameter as light source power [W] instead source irradiance [W/cm2]
-: ( amp [W/cm2] -> amp [W]
-: consequences from this ( was -> is ):
-:   - flux [photons/(time*area)] -> flux [photons/time] 
-:   - irradiance [W/cm2] -> [W]
-: - delete variable photons (which represented photons/time and was not used anyways)
+: delete parameter photons (unused) and reuse amp parameter instead 
+: of intensity as light power power_W in W
 
 TITLE Optical Stimulation
 
 NEURON {
     POINT_PROCESS ostim
     RANGE radius
-    RANGE delay, amp, dur
+    RANGE delay, power_W, dur
     RANGE pulses, isi, pcount
-    POINTER irradiance
     POINTER flux
     POINTER tstimon
     POINTER tstimoff
@@ -37,7 +32,7 @@ PARAMETER {
     :     Af = 0.6
     :     r = 0.1 mm
     :     Irradiance = Af * Psrc/(pi * r**2) = 380 mW/mm2 --> 0.38 W/mm2 --> 38 W/cm2
-    amp = 38                    (W)
+    power_W = 1                    (W)
     wavelength = 4.73e-7        (m)
     h = 6.6260693e-34           (m2 kg/s)  : planck's constant
     c = 299792458.0             (m/s)      : speed of light
@@ -49,7 +44,6 @@ PARAMETER {
 
 ASSIGNED {
     on
-    irradiance (W)         : W
     flux      (1/ms)       : photons/ms
     pcount
     tstimon
@@ -59,7 +53,6 @@ ASSIGNED {
 INITIAL {
     on          = 0
     pcount      = pulses
-    irradiance   = 0
     flux        = 0
     net_send(delay,1)          : Sends a packet that should arrive after given initial_delay
     tstimon     = 0
@@ -68,7 +61,6 @@ INITIAL {
 
 BEFORE BREAKPOINT {
     if (on==0) {
-        irradiance = 0
         flux      = 0
     } else if (on==1) {
         calc_irradiance_photons_flux()
@@ -98,9 +90,8 @@ NET_RECEIVE (w) {
 
 FUNCTION calc_irradiance_photons_flux() {
     LOCAL photon_energy
-    irradiance = amp
     photon_energy = h * c / wavelength : J / photon
-    flux = (1 / 1000) * amp / photon_energy : (1 s / 1000 ms) * (W) * (photons/W s)
-                                              :     --> photons/ms cm2
+    flux = (1 / 1000) * power_W / photon_energy : (1 s / 1000 ms) * (W) * (1/(W*s))
+                                              :     --> number of photons/ms
 }
 

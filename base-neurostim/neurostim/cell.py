@@ -1,25 +1,17 @@
 from neuron import h
 import os
 from neurostim.utils import arbitrary_3d_rotation_along_axis
+from neurostim.utils import rm_mech
 import numpy as np
-
-
-def rm_mech(mech, sec):
-    mt = h.MechanismType(0)
-    mt.select(mech)
-    mt.remove(sec=sec)
-
 
 class Cell:
     def __init__(
         self,
         hoc_file,
         cortical_depth=None,
-        #n_ChR_channels=10354945,
         ChR_soma_density=13e9,
         ChR_distribution="uniform",
         rm_mech_from_secs=None,
-        delete_all_secs_except_soma=False
     ):
         """
         Parameters:
@@ -28,52 +20,34 @@ class Cell:
         hoc_file: str
             name of hoc file from which cell is loaded
         cortical_depth: dict
-            Dictionary with name of cell ('L23' or 'L5') and corresponding depth of soma in cortical column measured from the surface
+            Dictionary with name of cell ('L23' or 'L5') and corresponding
+            depth of soma in cortical column measured from the surface
         ChR_soma_density: float
             ChR density in soma in 1/cm2, Foutz et al use 13e9 /cm2
-        n_ChR_channels: int
-            Number of ChR2 channels distributed over the neuron, default value is the number of channels distributed in the L5 cell from Foutz et al 2012 in the condition of a uniform ChR density of 13000000000 channels 1/cm2
         ChR_distribution: {'uniform', 'shemesh_fig1m_untrgtd', shemesh_fig1n_trgtd'}
             Type of distribution to distirbute the ChR channels over the morphology
         rm_mech_from_secs: [list of str, list of str]
-            List containing on the first position a list of the mechanisms to remove, e.g. 'na' and secs from which these mechansisms are removed on the second position, e.g., 'h.soma'
-
+            List containing on the first position a list of the mechanisms to remove,
+            e.g. 'na' and secs from which these mechansisms are removed on the second
+            position, e.g., 'h.soma'
         """
         self.hoc_file = hoc_file
         allowed_hoc = [
             "L23.hoc",
-            "L23_noNa_in_soma.hoc",
-            "L23OnlyChR2.hoc",
             "L23soma.hoc",
-            "L23somaOnlyChR2.hoc",
-            "L23somaWithoutNa.hoc",
-            "L23WithoutNa.hoc",
-            "L23WithoutNaAtSoma.hoc",
             "L5.hoc",
-            "L5_noNa_in_soma.hoc",
         ]
         self.allowed_hoc_files = [os.path.join("simneurostim/model", "hoc", h) for h in allowed_hoc]
         self._construct_cell(hoc_file)
         self._rotate_in_vertical_position()
         self._move_to_cortical_position(cortical_depth)
-        #self._distribute_ChR_channels(
-        #    n_channels=n_ChR_channels, distribution=ChR_distribution
-        #)
         self._distribute_ChR_density(
-            ChR_soma_density=ChR_soma_density, distribution=ChR_distribution
+            ChR_soma_density=ChR_soma_density,
+            distribution=ChR_distribution
         )
         self._assign_pos_chanrhod()
         self.segs_coord = self.get_segs_coord_dict()
-        # self.dendrites = [
-        #     s for s in h.allsec() if s.name() not in ["soma", "Soma", "SOMA"]
-        # ]
-        if delete_all_secs_except_soma:
-            # delete all sections except of soma
-            for sec in list(h.allsec()):
-                if sec !=h.soma:
-                    h.delete_section(sec=sec)
         self.soma_child_relations = self._get_soma_child_relations()
-
         if rm_mech_from_secs != None:
             for mech in rm_mech_from_secs[0]:
                 for sec in rm_mech_from_secs[1]:
@@ -84,7 +58,6 @@ class Cell:
 
     def _assign_pos_chanrhod(self):
         """Assign x, y, and z chanrhod to neuron section"""
-        # TODO figure out why I need to interpolate
         for sec in list(h.allsec()):
             if h.ismembrane("chanrhod", sec=sec):
                 n = sec.n3d()
@@ -116,7 +89,8 @@ class Cell:
                     sec(xr).z_chanrhod = z_int.x[i]
 
     def _get_soma_child_relations(self):
-        """Get array of tuples with soma children segments and their parent segment.
+        """
+        Get soma children segments and their parent segment.
 
         Returns:
             array of tuples: children segs on 1st pos, corresponding
@@ -187,96 +161,6 @@ class Cell:
                         distance_from_soma_center, distribution=distribution
                     )
         return None
-
-
-    def _distribute_ChR_channels(self, n_channels, distribution):
-        """
-        Distribute channelrhodopsin throughout the morphology matching channels in the cell
-
-        Parameters:
-        -----------
-
-        n_ChR_channels: int
-            number of ChR2 channels to distribute
-
-        distribution: {'uniform','shemesh_supfig9b_exp_yoff','shemesh_supfig9b_exp_lin_yoff'}
-            derivation in 'metadata/CoChR_expression_levels_Shemesh_et_al2021*.ipynb'.
-        """
-        def _get_ChR_channels_in_list(seclist):
-            channels = 0
-            for sec in seclist:
-                if h.ismembrane("chanrhod", sec=sec):
-                    for seg in sec:
-                        rho = seg.channel_density_chanrhod / 1e8  # 1/cm2 --> 1/um2
-                        area = h.area(seg.x, sec=sec)  # um2
-                        n = rho * area
-                        channels += n
-            return channels
-
-
-        # get ChR expression level for each segment and count distributed channels
-        distributed_channels = 0
-        for sec in h.allsec():
-            if h.ismembrane("chanrhod", sec=sec):
-                for seg in sec:
-                    distance_from_soma_center = h.distance(h.soma(0.5), seg)  # um
-                    seg.channel_density_chanrhod = self._get_ChR_expression_level(
-                        distance_from_soma_center, distribution=distribution
-                    )
-                    rho = seg.channel_density_chanrhod / 1e8  # 1/cm2 --> 1/um2
-                    area = h.area(seg.x, sec=sec)  # um2
-                    n = rho * area
-                    distributed_channels += n
-        norm_to_n_channels = n_channels / distributed_channels
-        distributed_channels = 0
-        for sec in h.allsec():
-            if h.ismembrane("chanrhod", sec=sec):
-                for seg in sec:
-                    seg.channel_density_chanrhod *= norm_to_n_channels
-                    rho = seg.channel_density_chanrhod / 1e8  # 1/cm2 --> 1/um2
-                    area = h.area(seg.x, sec=sec)  # um2
-                    n = rho * area
-                    distributed_channels += n
-        assert 0.001 > abs(
-            distributed_channels - n_channels
-        ), "distributed channels != n_channels"
-        return None
-
-    def get_rec_variables_pointers_dict(self, record_all_segments=False):
-        """Allows to get a dictionary of pointers to the variables to record.
-            Such variables depends on the cell hoc file
-
-        Raises:
-            ValueError: if cell hoc file is not among the one in the list
-
-        Returns:
-            dict: dictionary of pointers to NEURON variables to record
-        """
-        var_names = ["time [ms]", "V_soma(0.5)", "i_ChR2_soma(0.5)"]
-        var_pointers = [
-            h._ref_t,
-            h.soma(0.5)._ref_v,
-            h.soma(0.5)._ref_i_chanrhod_chanrhod,
-        ]
-        if record_all_segments:
-            for sec in h.allsec():
-                for seg in sec:
-                    var_names.append("V_" + str(seg))
-                    var_pointers.append(seg._ref_v)
-                    if h.ismembrane("chanrhod", sec=sec):
-                        var_names.append("i_ChR2_" + str(seg))
-                        var_pointers.append(seg._ref_i_chanrhod_chanrhod)
-        if len(self.soma_child_relations) > 0:
-            # add voltage recordings of soma child segs and their parentseg
-            for soma_childseg, parentseg in self.soma_child_relations:
-                var_names.append("V_" + str(soma_childseg))
-                var_pointers.append(soma_childseg._ref_v)
-                if "V_" + str(parentseg) not in var_names:
-                    var_names.append("V_" + str(parentseg))
-                    var_pointers.append(parentseg._ref_v)
-
-        var_pointers_dict = dict(zip(var_names, var_pointers))
-        return var_pointers_dict
 
     def get_segs_coord_dict(self):
         """get dictionary of segments extremes/points inside the sections

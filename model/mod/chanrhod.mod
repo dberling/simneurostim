@@ -1,12 +1,9 @@
 : changes by David Berling to file as published by Foutz et al. (2012):
-: - use amp parameter (ostim.mod) as light source power [W] instead source irradiance [W/cm2]
-: ( amp [W/cm2] -> amp [W]
+: in conjunction with changing the meaning of the Tx parameter,
+: replaced amp [intensity] by power_W [power of stimulator in W]
 : consequences from this ( was -> is ):
 :   - source_flux [photons/(time*area)] -> source_flux [photons/time] 
-:   - source_irradiance [W/cm2] -> [W]
-: As a general consequence the units in the formulas, variable definitions and comments of formulas were adapted
-: However: Comments of experimental findings using a particular irradiance still refer to the 
-: actual irradiance in the unit power/area
+: further deleted parameters photons, irradiance, source_irradiance
 
 TITLE Four-State Model of chanrhod channel for Subthalamic Nucleus
 
@@ -21,15 +18,14 @@ NEURON { :public interface of the mechanism
     SUFFIX chanrhod :Name of the Channel
     NONSPECIFIC_CURRENT	icat
     :Specific Channel for Na, Ca, K
-    RANGE flux, irradiance, U, U0, U1
+    RANGE flux, U, U0, U1
     :Calculated optics values given source_values
     RANGE channel_density, gdens1, gdens2
     :Channel density and conductance. gdens1 = density conductance for o1. gdens2 = density conductance for o2
     RANGE x, y, z
     :Location of that segment (of nsegs)
-    :RANGE Ka1, Ka2, Kd1, Kd2, e12, e21, e12dark, e21dark, Kr, delta1, delta2, o10, o20, Islow, Ifast, c_1, c_2, b, h, c, amp, photon_energy, wavelength, phi0, phio, gcat
     :Various Rate Constants, phi0:constant, phio: static value of phi
-    GLOBAL source_flux, source_irradiance
+    GLOBAL source_flux
     :Optical Input
     RANGE Ka1, Ka2
     GLOBAL Kd1, Kd2
@@ -40,7 +36,7 @@ NEURON { :public interface of the mechanism
     RANGE Islow, Ifast
     RANGE c_1, c_2, b
     GLOBAL h, c
-    RANGE amp, photon_energy
+    RANGE source_intensity, photon_energy
     RANGE wavelength
     RANGE phi0, phio, gcat    
     GLOBAL sigma_retinal, gcat1, gcat2, ecat, Imax, gamma, tChR
@@ -117,10 +113,8 @@ ASSIGNED {  :calculated by the mechanism (computed by NEURON)
     icat        (mA/cm2)
     gdens1        (mho/cm2)
     gdens2        (mho/cm2)
-    source_irradiance  (W)      : Light power (W) exiting optrode, from ostim.mod
     source_flux        (photons/ms) : flux of photons exiting optrode per millisecond, from ostim.mod
-    irradiance          (W/cm2)      : light intensity reaching segment, from ostim.mod
-    flux               (photons/(ms*cm2) : number of photons reaching segment per area, from ostim.mod
+    flux               (photons/(ms) : number of photons reaching segment per area, from ostim.mod
     phi                (photons/ms) : number of photons hitting channel per millisecond
     U
     U0
@@ -131,7 +125,7 @@ ASSIGNED {  :calculated by the mechanism (computed by NEURON)
     c_1
     c_2
     b
-    amp
+    source_intensity
     photon_energy
     phi0
     phio
@@ -146,7 +140,6 @@ STATE { :state or independent variables
 }
 
 INITIAL {
-    irradiance = 0
     flux = 0
     phi = 0
     Islow=0
@@ -168,12 +161,9 @@ INITIAL {
 }
 
 BREAKPOINT {
-    irradiance = source_irradiance * Tx : (W) * (1/cm2)
     flux      = source_flux * Tx           : (photons/ms) * (1/cm2)
-    
-    phi       = flux             * sigma_retinal
-                : (photons/(ms*cm2) * (cm2)
-                :  --> (photons/ms / channel)
+    phi       = flux * sigma_retinal       : (photons/(ms*cm2) * (cm2)
+                                           : -> (photons/ms/channel)
 
 	U=v-ecat-vshift-75
 	U0=40

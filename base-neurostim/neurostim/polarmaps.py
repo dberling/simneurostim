@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.signal import argrelextrema
-
+from neurostim.analysis import get_AP_times
 
 def _get_radius_angle_amp(file):
     amp = float(re.search("--amp-(.*?)--delay", file).group(1))
@@ -12,11 +12,9 @@ def _get_radius_angle_amp(file):
     radius = float(re.search("--radius-(.*?)--angle", file).group(1))
     return radius, angle, amp
 
-
 def _get_tts(data, t_on):
     """Find time until first spike(V_soma > 0)"""
     return data["time [ms]"].loc[data["V_soma(0.5)"] > 0].values[0] - t_on
-
 
 def _get_intVsoma(data, t_on, t_off, interpol_dt):
     """Calculate integral of soma voltage between t_on and t_off"""
@@ -24,7 +22,6 @@ def _get_intVsoma(data, t_on, t_off, interpol_dt):
     cond = (data["time [ms]"] >= t_on) & (data["time [ms]"] <= t_off)
     intVsoma = np.sum(interpol_dt * (data["V_soma(0.5)"].loc[cond] - v_init))
     return intVsoma
-
 
 def generate_df(inputfiles, t_on, t_off, interpol_dt):
     all_data = []
@@ -45,34 +42,6 @@ def generate_df(inputfiles, t_on, t_off, interpol_dt):
             results["int(V_soma)"] = _get_intVsoma(data, t_on, t_off, interpol_dt)
         all_data.append(results)
     return pd.DataFrame(all_data)
-
-
-def get_AP_times(df, interpol_dt, t_on, AP_threshold=None, apply_to="V_soma(0.5)"):
-    """
-    Find number of action potentials (APs)
-
-    Check for following things:
-    - AP happens after stimulation onset
-    - peak finder relies on data 1ms before and after
-    """
-    # check 1ms before and after peak to be lower
-    n_points_1ms = int(1 / interpol_dt)
-    peak_times = df.loc[
-        argrelextrema(
-            df[apply_to].values, 
-            np.greater_equal, 
-            order=n_points_1ms)
-    ]["time [ms]"]
-    # eliminate all before stim on:
-    peak_times = peak_times.loc[peak_times > t_on]
-    # elimante all below threshold
-    if AP_threshold != None:
-        peak_values = np.array(
-            [df.loc[df['time [ms]'] == time][apply_to].values[0] for time in peak_times]
-        )
-        peak_times = peak_times[peak_values > AP_threshold]
-    return peak_times
-
 
 def polar_cmap(data, vmin_tts=None, vmax_tts=None, vmin_intV=None, vmax_intV=None):
     amplitudes = data.amp.unique()
@@ -128,7 +97,6 @@ def polar_cmap(data, vmin_tts=None, vmax_tts=None, vmin_intV=None, vmax_intV=Non
 
     return fig, axs
 
-
 def polar_cmap2(data, vmin_tts=None, vmax_tts=None, vmin_intV=None, vmax_intV=None):
     amplitudes = data.amp.unique()
     radii = data.radius.unique()
@@ -181,7 +149,6 @@ def polar_cmap2(data, vmin_tts=None, vmax_tts=None, vmin_intV=None, vmax_intV=No
     cbar_tts.set_label("time to 1st spike [ms]")
 
     return fig, axs
-
 
 def simple_polar_map(
     data,
