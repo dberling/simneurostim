@@ -179,24 +179,28 @@ def simulate_spatial_profile_wo_NEURONsetup(
                 stimulator=stimulator
             )
             # run simulation
-            sim_data = simcontrol.run(
-                temp_protocol=temp_protocol,
-                stim_location=(stim_x_um, stim_y_um, stim_z_um),
-                stim_intensity_mWPERmm2=stim_intensity_mWPERmm2,
-                rec_vars=seg_rec_vars,
-                interpol_dt_ms=interpol_dt_ms,
-            )
-            #print(sim_data.columns)
-            if sim_data_transform != None:
-                # apply transformation to variables named str(seg)
-                sim_data_transform(sim_data, segs)
-            scalar_results = [func(sim_data,segs) for func in scalar_result_funcs]
-            if vector_result_func != None:
-                result = vector_result_func(sim_data, segs)
-                for name, scalar_result in zip(scalar_result_names, scalar_results):
-                    result[name] = scalar_result
-            else:
-                result = pd.DataFrame(columns=scalar_result_names, data=scalar_results)
+            try:
+                sim_data = simcontrol.run(
+                    temp_protocol=temp_protocol,
+                    stim_location=(stim_x_um, stim_y_um, stim_z_um),
+                    stim_intensity_mWPERmm2=stim_intensity_mWPERmm2,
+                    rec_vars=seg_rec_vars,
+                    interpol_dt_ms=interpol_dt_ms,
+                )
+                #print(sim_data.columns)
+                if sim_data_transform != None:
+                    # apply transformation to variables named str(seg)
+                    sim_data_transform(sim_data, segs)
+                scalar_results = [func(sim_data,segs) for func in scalar_result_funcs]
+                if vector_result_func != None:
+                    result = vector_result_func(sim_data, segs)
+                    for name, scalar_result in zip(scalar_result_names, scalar_results):
+                        result[name] = scalar_result
+                else:
+                    result = pd.DataFrame(columns=scalar_result_names, data=scalar_results)
+                result['RuntimeError'] = False
+            except RuntimeError:
+                result['RuntimeError'] = True
             # define index of result dataframe
             result["hoc_file"] = cell_dict['cellname']
             result["chanrhod_distribution"] = cell_dict['ChR_distribution']
@@ -225,6 +229,7 @@ def simulate_spatial_profile_wo_NEURONsetup(
             "angle [rad]",
         ]
     )
+    spatial_profile_df['RuntimeError'] = spatial_profile_df['RuntimeError'].astype(bool)
     return spatial_profile_df
 
 def find_x_at_value(xarray, varray, value):
