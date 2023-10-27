@@ -1,3 +1,5 @@
+*** This repository currently may work only together with its parent repository "morph_impact_on_opt_stim", please check its README as well. ***
+
 # simneurostim
 Simulate neural stimulation with biophysically detailed single neuron models (NEURON).
 
