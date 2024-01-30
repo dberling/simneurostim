@@ -19,8 +19,7 @@ class Cell:
 
         hoc_file: str
             name of hoc file from which cell is loaded
-        cortical_depth: dict
-            Dictionary with name of cell ('L23' or 'L5') and corresponding
+        cortical_depth: float
             depth of soma in cortical column measured from the surface
         ChR_soma_density: float
             ChR density in soma in 1/cm2, Foutz et al use 13e9 /cm2
@@ -178,9 +177,6 @@ class Cell:
 
     def _rotate_in_vertical_position(self):
         """Rotate cell so that z is the vertical axis"""
-        assert (
-            self.hoc_file in self.allowed_hoc_files
-        ), "hoc file not in the list of the allowed ones"
         if "L23" in self.hoc_file:
             axis = "x"
             angle = np.pi / 2
@@ -194,23 +190,17 @@ class Cell:
                 h.pt3dchange(i, *rot_pos, sec.diam3d(i), sec=sec)
 
     def _move_to_cortical_position(self, cortical_depth):
-        assert (
-            self.hoc_file in self.allowed_hoc_files
-        ), "hoc file not in the list of the allowed ones"
         if cortical_depth == None:
             if "L23" in self.hoc_file:
                 self.cortical_depth = 400
             if "L5" in self.hoc_file:
-                self.cortical_depth = 1150
+                self.cortical_depth = 1170
             print(
                 "Warning: Parameter cortical_depth not given when cell was initialized. The parameter was set to %4f um."
                 % self.cortical_depth
             )
         else:
-            if "L23" in self.hoc_file:
-                self.cortical_depth = cortical_depth["L23"]
-            if "L5" in self.hoc_file:
-                self.cortical_depth = cortical_depth["L5"]
+            self.cortical_depth = cortical_depth
         for sec in h.allsec():
             for i in range(sec.n3d()):
                 cortex_pos = [sec.x3d(i), sec.y3d(i), sec.z3d(i) - self.cortical_depth]
