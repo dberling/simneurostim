@@ -82,8 +82,7 @@ def simulate_spatial_profile(
     -------
     cell_dict: dict;
         Cell properties including:
-        cellname: str;
-        cortical_depth: dict;
+        cellmodel: model obj returned by function from models.py;
         ChR_soma_density: float;
         ChR_distribution: str;
     stimulator_dict: dict;
@@ -101,11 +100,12 @@ def simulate_spatial_profile(
         duration_ms: int;
         delay_ms: int;
         total_rec_time_ms: int;
-    seg_rec_vars: list of 2 lists of str;
+    seg_rec_vars: list of 2 lists of str or None;
         [variable_names, variable_hoc_pointers], e.g.
         [['time [ms]', 'V_soma(0.5)'],
          ['h._ref_t', 'h.soma(0.5)._ref_v']] to record
          time in ms and voltage at soma in mV.
+         If None: record time and membr. voltage at soma.
     allseg_rec_var: str/None;
         pointer which will be systematically applied to all segments, e.g.
         '._ref_g_cat_chanrhod' will record ChR conductance in all segs,
@@ -133,12 +133,16 @@ def simulate_spatial_profile(
     h.cvode_active(1)
     # load cell
     cell = Cell(
-        hoc_file="simneurostim/model/hoc/" + cell_dict['cellname'] + ".hoc",
-        cortical_depth=cell_dict['cortical_depth'],
+        model=cell_dict['cellmodel'],
         ChR_soma_density = cell_dict['ChR_soma_density'],
         ChR_distribution=cell_dict['ChR_distribution'],
-        rm_mech_from_secs=None,
     )
+    if seg_rec_vars == None:
+        # record time and membr. voltage at soma:
+        seg_rec_vars = [
+                ['time [ms]', 'V_soma(0.5)'],
+                ['h._ref_t', 'h.'+str(cell.model.soma_sec)+'(0.5)._ref_v']
+        ]
     # create list of segments
     segs = [seg for sec in h.allsec() for seg in sec]
     if allseg_rec_var != None:
@@ -288,11 +292,9 @@ def find_target_pr(
     # load cell
     cell_dict = simulate_spatial_profile_args['cell_dict']
     cell = Cell(
-        hoc_file="simneurostim/model/hoc/" + cell_dict['cellname'] + ".hoc",
-        cortical_depth=cell_dict['cortical_depth'],
+        model=cell_dict['cellmodel'],
         ChR_soma_density = cell_dict['ChR_soma_density'],
         ChR_distribution=cell_dict['ChR_distribution'],
-        rm_mech_from_secs=None,
     )
     # init stimulator
     stimulator_dict=simulate_spatial_profile_args['stimulator_dict']
