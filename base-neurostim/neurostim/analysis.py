@@ -5,6 +5,7 @@ from neurostim.cell import Cell
 from neurostim.stimulator import Stimulator
 from neurostim.simulation import SimControl
 from neurostim.utils import convert_polar_to_cartesian_xz
+from neurostim.models import *
 from scipy.signal import argrelextrema
 
 def get_AP_times(df, interpol_dt, t_on, AP_threshold=None, apply_to="V_soma(0.5)"):
@@ -82,7 +83,8 @@ def simulate_spatial_profile(
     -------
     cell_dict: dict;
         Cell properties including:
-        cellmodel: model obj returned by function from models.py;
+        cellmodel: name of model as corresponding to a function 
+            implementing the model in models.py;
         ChR_soma_density: float;
         ChR_distribution: str;
     stimulator_dict: dict;
@@ -133,7 +135,7 @@ def simulate_spatial_profile(
     h.cvode_active(1)
     # load cell
     cell = Cell(
-        model=cell_dict['cellmodel'],
+        model=eval(cell_dict['cellmodel']+'()'),
         ChR_soma_density = cell_dict['ChR_soma_density'],
         ChR_distribution=cell_dict['ChR_distribution'],
     )
@@ -206,7 +208,7 @@ def simulate_spatial_profile_wo_NEURONsetup(
             except RuntimeError:
                 result['RuntimeError'] = True
             # define index of result dataframe
-            result["hoc_file"] = cell_dict['cellname']
+            result["hoc_file"] = cell_dict['cellmodel']
             result["chanrhod_distribution"] = cell_dict['ChR_distribution']
             result["chanrhod_expression"] = cell_dict['ChR_soma_density']
             result["light_model"] = stimulator.modelname
