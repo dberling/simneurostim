@@ -27,11 +27,8 @@ class Cell:
         ChR_distribution: {'uniform', 'shemesh_fig1m_untrgtd', shemesh_fig1n_trgtd'}
             Type of distribution to distirbute the ChR channels over the morphology
         """
-        if len(model) == 2:
-            self.model = model[0]
-            self.h_obj = model[1]
-        else:
-            self.model = model
+        self.model = model[0]
+        self.h_obj = model[1]
         self._distribute_ChR_density(
             ChR_soma_density=ChR_soma_density,
             distribution=ChR_distribution
