@@ -100,3 +100,14 @@ def rm_mech(mech, sec):
     mt = h.MechanismType(0)
     mt.select(mech)
     mt.remove(sec=sec)
+    
+def drop_single_val_indexes(df):
+    """
+    Drops all index columns which only contain a single level value.
+    """
+    lvls_to_drop = [lvl_idx for lvl_idx, lvl_name in enumerate(df.index.names)\
+                    if len(df.index.get_level_values(lvl_idx).unique()) == 1]
+    return df.droplevel(lvls_to_drop)
+    lvls_to_drop = [lvl_idx for lvl_idx, lvl_name in enumerate(df.index.names)\
+                    if len(df.index.get_level_values(lvl_idx).unique()) == 1]
+    return df.droplevel(lvls_to_drop)
