@@ -168,5 +168,6 @@ def L5_Hay2011_cell2_vertical_shaft():
             angle = -1*np.pi/16
     )
     cell._rotate()
+    cell._move_to_soma_position(soma_xyz=[0, 0, -1100])
     return cell, _
 
