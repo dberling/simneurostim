@@ -161,3 +161,12 @@ def L5_Hay2011_cell1():
     return L5_Hay2011(cell='cell1')
 def L5_Hay2011_cell2():
     return L5_Hay2011(cell='cell2')
+def L5_Hay2011_cell2_vertical_shaft():
+    cell, _ = L5_Hay2011(cell='cell2')
+    cell.rotation = dict(
+            axis = 'y',
+            angle = -1*np.pi/16
+    )
+    cell._rotate()
+    return cell, _
+
