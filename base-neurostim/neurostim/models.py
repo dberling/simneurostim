@@ -170,4 +170,9 @@ def L5_Hay2011_cell2_vertical_shaft():
     cell._rotate()
     cell._move_to_soma_position(soma_xyz=[0, 0, -1100])
     return cell, _
-
+def L5_Hay2011_cell2_vertical_shaft_10higherapicsod():
+    cell, hoc_obj = L5_Hay2011_cell2_vertical_shaft()
+    for sec in h.allsec():
+        if 'apic' in str(sec) and sec.has_membrane('NaTa_t'):
+            sec.gNaTa_tbar_NaTa_t *= 10
+    return cell, hoc_obj
