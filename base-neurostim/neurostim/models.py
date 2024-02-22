@@ -176,3 +176,15 @@ def L5_Hay2011_cell2_vertical_shaft_10higherapicsod():
         if 'apic' in str(sec) and sec.has_membrane('NaTa_t'):
             sec.gNaTa_tbar_NaTa_t *= 10
     return cell, hoc_obj
+def L5_Hay2011_cell2_vertical_shaft_2higherapicsod():
+    cell, hoc_obj = L5_Hay2011_cell2_vertical_shaft()
+    for sec in h.allsec():
+        if 'apic' in str(sec) and sec.has_membrane('NaTa_t'):
+            sec.gNaTa_tbar_NaTa_t *= 2
+    return cell, hoc_obj
+def L5_Hay2011_cell2_vertical_shaft_5higherapicsod():
+    cell, hoc_obj = L5_Hay2011_cell2_vertical_shaft()
+    for sec in h.allsec():
+        if 'apic' in str(sec) and sec.has_membrane('NaTa_t'):
+            sec.gNaTa_tbar_NaTa_t *= 5
+    return cell, hoc_obj
