@@ -192,7 +192,7 @@ def avrg_angles(df):
     )
     return avrg_angles
 
-def find_xAPCs_over_light_pwrs(df, longform=False, groupby=None):
+def find_xAPCs_over_light_pwrs(df, longform=False, groupby=None, rad_label='radius [um]'):
     """input: angle averaged df
        output: metadata df with:
        APC = action potential count
@@ -220,7 +220,7 @@ def find_xAPCs_over_light_pwrs(df, longform=False, groupby=None):
         pd.DataFrame(
         df[['AP_count', 'i_APCmax', 'APCmax']].groupby(groupby).apply(
         lambda df: find_x_at_value(
-            xarray=df.index.get_level_values('radius [um]')[df['i_APCmax'][0]:],
+            xarray=df.index.get_level_values(rad_label)[df['i_APCmax'][0]:],
             varray=df['AP_count'][df['i_APCmax'][0]:],
             value=df['APCmax'][0] * 0.5)),
         columns=['x_APC50'])
@@ -228,7 +228,7 @@ def find_xAPCs_over_light_pwrs(df, longform=False, groupby=None):
     df = df.join(pd.DataFrame(
         df[['AP_count', 'APCmax','i_APCmax','x_APC50']].groupby(groupby).apply(
         lambda df: find_x_at_value(
-            xarray=df.index.get_level_values('radius [um]')[df['i_APCmax'][0]:],
+            xarray=df.index.get_level_values(rad_label)[df['i_APCmax'][0]:],
             varray=df['AP_count'][df['i_APCmax'][0]:],
             value=df['APCmax'][0] * 0.1)),
         columns=['x_APC10'])
@@ -241,7 +241,7 @@ def find_xAPCs_over_light_pwrs(df, longform=False, groupby=None):
     # add radius ("x") at max(APcount), 50%*max(APcount), 10%*max(APcount)
     df = df.join(pd.DataFrame(
         df[['AP_count', 'APCmax','i_APCmax','x_APC50','x_APC10','APC_x0','APCmax']].groupby(groupby).apply(
-        lambda df: df.index.get_level_values('radius [um]')[df['i_APCmax'][0]]), columns=['x_APCmax']
+        lambda df: df.index.get_level_values(rad_label)[df['i_APCmax'][0]]), columns=['x_APCmax']
     ), how='outer')
     # remove radii and respective AP counts from dataframe to keep only metadata
     df = df[['i_APCmax','x_APC50','x_APC10', 'APC_x0','APCmax','x_APCmax']].groupby(groupby).apply(
@@ -251,7 +251,7 @@ def find_xAPCs_over_light_pwrs(df, longform=False, groupby=None):
         df_melted = pd.melt(df[['x_APCmax', 'x_APC50', 'x_APC10']].reset_index(),
                 id_vars=groupby,
                 value_vars=['x_APCmax', 'x_APC50', 'x_APC10'],
-               value_name='radius [um]').set_index(groupby)
+               value_name=rad_label).set_index(groupby)
         return df_melted
     return df
 
