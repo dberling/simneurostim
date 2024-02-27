@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from scipy.interpolate import interp1d
 
 ### functions for analysis where APC is fixed to desired value
 
@@ -183,14 +184,17 @@ def eval_spatial_resolution(df, APC_desired_tolerance=0.1):
 ### functions for analysis where the response for different light powers is simulated 
 ### and the spatial resolution shall be evaluated and plotted as a lineplot
 
-def avrg_angles(df):
-    avrg_angles = pd.DataFrame(
-        df[['firint_rate [Hz]', 'AP_count']].groupby([
+def avrg_angles(df, groupby=None):
+    if groupby == None:
+        groupby = [
             'hoc_file', 'light_model', 'chanrhod_distribution', 'chanrhod_expression',
-            'fiber_diameter','fiber_NA','stim_duration [ms]','light_power','radius [um]']
-        ).mean()
+            'fiber_diameter','fiber_NA','stim_duration [ms]','light_power','radius [um]'
+        ]
+    avrg_angles = pd.DataFrame(
+        df[['firint_rate [Hz]', 'AP_count']].groupby(groupby).mean()
     )
     return avrg_angles
+
 
 def find_xAPCs_over_light_pwrs(df, longform=False, groupby=None, rad_label='radius [um]'):
     """input: angle averaged df
@@ -278,3 +282,52 @@ def lineplot_x_APs_and_APC(paramsetdf,paramsetdf_long, ax=None, c1='tab:blue', c
     ax.set_ylim(0,400)
     ax2.set_ylim(0,30)
     return ax, ax2
+
+#### IMPROVED Feb 24
+def find_xAPC50(df):
+    """
+    improved version to calc response radius
+    """
+    df = df.reset_index()
+    if df.AP_count.sum() < 1:
+        return np.nan
+    if 'radius [um]' in df.columns:
+        df = df.rename(columns={'radius [um]': 'radius'})
+    interpolation = interp1d(df.radius.values, df.AP_count.values)
+    # radius at peak response
+    x_APCmax = df[df.AP_count==df.AP_count.max()].radius.values[0]
+    rmax = df.radius.max()
+    radii_interpolated = np.linspace(0,rmax,rmax)
+    APC_interpolated = interpolation(radii_interpolated)
+    # find largest radius at which AP count is half-max
+    tolerance = np.sqrt(df.AP_count.max()) * 0.05 + 0.01
+    x_APC50_outmost = np.max(radii_interpolated[np.abs(APC_interpolated-df.AP_count.max()/2)<tolerance])
+    return x_APC50_outmost
+
+def improved_find_xAPC50_over_lps(df, groupby=None):
+    """
+    Find response radius (APC50) and peak response (APCmax).
+    - avrg over angle
+    - groupby (w/o radius)
+    - calc rr and pr
+    """
+    if groupby == None:
+        groupby = [
+            'hoc_file', 'light_model', 'chanrhod_distribution', 'chanrhod_expression',
+            'fiber_diameter','fiber_NA','stim_duration [ms]','light_power'
+        ]
+    if 'radius' in df.reset_index().columns:
+        rad_label = 'radius'
+    elif 'radius [um]' in df.reset_index().columns:
+        rad_label = 'radius [um]'
+    else:
+        raise ValueError("Cannot detect radius column in dataframe df.")
+    # avrg angles
+    df_angavrg = df.groupby(groupby+[rad_label]).mean()
+    # calc peak response
+    APCmax = df_angavrg.groupby(groupby).max()
+    # calc response radius
+    xAPC50 = df_angavrg.groupby(groupby).apply(lambda x:find_xAPC50(x.reset_index()))
+    
+    spres = pd.DataFrame(APCmax).join(pd.DataFrame(xAPC50, columns=['xAPC50'])).rename(columns={'AP_count':'APCmax'})
+    return spres
