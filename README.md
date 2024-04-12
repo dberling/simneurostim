@@ -1,5 +1,5 @@
 # simneurostim
-Simulate neural stimulation with biophysically detailed single neuron models (NEURON).
+Simulate neural stimulation with biophysically detailed single neuron models using NEURON [1].
 
 # Setting up the simulation environment
 We suggest to embed this repository with simulation and model code inside your project's repository, e.g.:
@@ -35,6 +35,10 @@ You can then follow the following steps to set up the simulation software:
 # Errors due to separation of simulation & model code from this particular analysis
 
 Errors which might appear and how to fix:
+
 * old module name "optostim" may appear in code, replace by "neurostim"
+
+# References
+[1] https://www.neuron.yale.edu/neuron/
 * paths of neuron / cell models may be given for the old location ("model/hoc/...") but are now located at "simneurostim/model/hoc/..."
 
