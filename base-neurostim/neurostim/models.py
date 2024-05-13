@@ -1,7 +1,8 @@
 import subprocess
 from neuron import h
-from neurostim.utils import arbitrary_3d_rotation_along_axis
+from neurostim.utils import arbitrary_3d_rotation_along_axis, find_depth
 import numpy as np
+import os
 
 def compile_mod_files(mod_dir):
     """
@@ -23,15 +24,21 @@ class CellModelTemplate():
         whether to insert ChR
     soma_sec: str
         name of soma section
+    soma_nrn_sec: nrn.Section
+        soma section
     """
     def __init__(
         self,
         soma_xyz,
         rotation,
         insert_ChR,
-        soma_sec
+        soma_sec=None,
+        soma_nrn_sec=None
         ):
-        self.soma_sec = eval('h.'+soma_sec)
+        if soma_sec != None:
+            self.soma_sec = eval('h.'+soma_sec)
+        else:
+            self.soma_sec = soma_nrn_sec
         self.rotation = rotation
         self._rotate()
         self._move_to_soma_position(soma_xyz=soma_xyz)
@@ -188,3 +195,89 @@ def L5_Hay2011_cell2_vertical_shaft_5higherapicsod():
         if 'apic' in str(sec) and sec.has_membrane('NaTa_t'):
             sec.gNaTa_tbar_NaTa_t *= 5
     return cell, hoc_obj
+
+def NeatCellModel(modelname, passified_dendrites, 
+    comp_channels_name):
+    """
+    Load Models from BBP-based NEAT-models implemented by
+    Joshua Boettcher and Willem Wybo in NEAST_models repo
+
+    params:
+    -------
+    modelname: str
+        name of the model as in BBP
+    passified_dendrites: bool
+        whether to passify dendrites through NEAT or not.
+    comp_channels_name: str
+        name assigned to compiled ion channels (mod files)
+
+    returns:
+    --------
+    cell: CellModelTemplate
+        object that sets up cell parameters and contains cell information
+    hoc_obj: None
+        Needed to comply with other model implementations.
+    sim_tree: neat.tools.simtools.neuron.neuronmodel.NeuronSimTreeWith3DCoords
+        Representation of the neuron model in NEAT.
+    """
+    
+    import neat
+    from neat.tools.simtools.neuron.neuronmodel import NeuronSimTreeWith3DCoords
+    import sys, os
+    sys.path.append(
+            os.path.abspath(os.path.dirname("NEAST_models/BBP/")))
+    from neatmodel import NeatModel, BBPConfig
+    # import neat cell dict with cell parameters
+    exec(' '.join(['from', 'neat_dicts.'+modelname, 'import', modelname+'_config']))
+    neat_cell_dict = eval(modelname+'_config')
+    # load compiled mod files
+    neat.loadNeuronModel(comp_channels_name)
+
+    model = NeatModel(
+        BBPConfig(**neat_cell_dict), 
+        channels=neat_cell_dict['channels'], 
+        w_ca_conc=False, 
+        passified_dendrites=passified_dendrites)
+
+    # NeuronSimTree for simulating model in NEURON
+    sim_tree = model.ph_tree.__copy__(
+            new_tree=NeuronSimTreeWith3DCoords()
+    )
+    sim_tree.initModel(t_calibrate=100.)
+    
+    # set depth to mean layer depth or if cell 
+    # exceeds cortical surface in this case to
+    # 50um distance from apical dendrite end to surface
+    depth = find_depth(
+        cellname=modelname, 
+        sections=[item[1] for item in sim_tree.sections.items()]
+    )
+    # use CellModelTemplate to define cell properties
+    cell = CellModelTemplate(
+            soma_xyz = [0,0,-1*depth], #um
+            rotation = dict(
+                axis="x",
+                angle=np.pi/2
+            ),
+            insert_ChR=True,
+            soma_nrn_sec=sim_tree.sections[1]
+    )
+    cell.modelname = modelname
+    return cell, None, sim_tree
+
+# dynamic definition of BBPmodels as functions
+BBPcells_to_be_defined = [
+        modelfilename[:-3] for modelfilename in os.listdir("NEAST_models/BBP/neat_dicts/")]
+def create_BBPmodel_function(funcname,pass_dends):
+    def wrapper():
+        return NeatCellModel(
+                modelname=funcname, passified_dendrites=pass_dends, comp_channels_name="BBPChannelsChR2"
+        )
+    return wrapper
+
+import sys
+thismodule = sys.modules[__name__]
+# Dynamically create functions and assign them to this modules namespace
+for funcname in BBPcells_to_be_defined:
+    setattr(thismodule, funcname, create_BBPmodel_function(funcname, pass_dends=False))
+    setattr(thismodule, funcname+'_passdends', create_BBPmodel_function(funcname, pass_dends=True))
