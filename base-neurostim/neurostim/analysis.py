@@ -5,7 +5,7 @@ from neurostim.cell import Cell
 from neurostim.stimulator import Stimulator
 from neurostim.simulation import SimControl
 from neurostim.utils import convert_polar_to_cartesian_xz
-from neurostim.models import *
+from neurostim import models
 from scipy.signal import argrelextrema
 
 def get_AP_times(df, interpol_dt, t_on, AP_threshold=None, apply_to="V_soma(0.5)"):
@@ -133,9 +133,10 @@ def simulate_spatial_profile(
     # NEURON setup
     h.load_file("stdrun.hoc")
     h.cvode_active(1)
-    # load cell
+    # load model
+    cellmodel = getattr(models,cell_dict['cellmodel'])
     cell = Cell(
-        model=eval(cell_dict['cellmodel']+'()'),
+        model=cellmodel(),
         ChR_soma_density = cell_dict['ChR_soma_density'],
         ChR_distribution=cell_dict['ChR_distribution'],
     )
@@ -143,7 +144,7 @@ def simulate_spatial_profile(
         # record time and membr. voltage at soma:
         seg_rec_vars = [
                 ['time [ms]', 'V_soma(0.5)'],
-                ['h._ref_t', 'h.'+str(cell.model.soma_sec)+'(0.5)._ref_v']
+                [h._ref_t, cell.model.soma_sec(0.5)._ref_v]
         ]
     # create list of segments
     segs = [seg for sec in h.allsec() for seg in sec]
@@ -332,3 +333,179 @@ def find_target_pr(
             test_si = np.nan
             break
     return test_si
+
+def quick_sim_setup(cell_dict,stimulator_dict):
+    """
+    Quick setup of simulation.
+    """
+    # NEURON setup
+    h.load_file("stdrun.hoc")
+    h.cvode_active(1)
+    # load model
+    cellmodel = getattr(models,cell_dict['cellmodel'])
+    cell = Cell(
+        model=cellmodel(),
+        ChR_soma_density = cell_dict['ChR_soma_density'],
+        ChR_distribution=cell_dict['ChR_distribution'],
+    )
+    # init stimulator
+    stimulator = Stimulator(
+        diameter_um=stimulator_dict['diameter_um'],
+        NA=stimulator_dict['NA'],
+    )
+    # init simulation
+    simcontrol = SimControl(
+        cell=cell,
+        stimulator=stimulator
+    )
+    return simcontrol
+
+def simulate_APC(stim_intensity_mWPERmm2, simcontrol, temp_protocol, AP_threshold_mV):
+    """
+    Simulate AP count for stim intensity.
+    """
+    
+    interpol_dt_ms = 0.1
+    sim_data = simcontrol.run(
+        temp_protocol=temp_protocol,
+        stim_location=(0,0,0), # center
+        stim_intensity_mWPERmm2=stim_intensity_mWPERmm2,
+        rec_vars=[
+            ['time [ms]', 'V_soma(0.5)'],
+            [h._ref_t, simcontrol.cell.model.soma_sec(0.5)._ref_v]
+        ],
+        interpol_dt_ms=interpol_dt_ms,
+    )
+    AP_count = get_AP_count(
+        sim_data,
+        interpol_dt_ms=interpol_dt_ms,
+        t_on_ms=temp_protocol['delay_ms'],
+        AP_threshold_mV=AP_threshold_mV
+    )
+    return AP_count
+
+def simulate(stim_intensity_mWPERmm2, simcontrol, temp_protocol, AP_threshold_mV, plot=False):
+    
+    interpol_dt_ms = 0.1
+    sim_data = simcontrol.run(
+        temp_protocol=temp_protocol,
+        stim_location=(0,0,0), # center
+        stim_intensity_mWPERmm2=stim_intensity_mWPERmm2,
+        rec_vars=[
+            ['time [ms]', 'V_soma(0.5)'],
+            [h._ref_t, simcontrol.cell.model.soma_sec(0.5)._ref_v]
+        ],
+        interpol_dt_ms=interpol_dt_ms,
+    )
+    if plot:
+        sim_data.plot(x='time [ms]', y='V_soma(0.5)')
+    AP_count = get_AP_count(
+        sim_data,
+        interpol_dt_ms=interpol_dt_ms,
+        t_on_ms=temp_protocol['delay_ms'],
+        AP_threshold_mV=AP_threshold_mV
+    )
+    return sim_data
+
+def my_bisection(f, a, b, tol):
+    # approximates a root, R, of f bounded
+    # by a and b to within tolerance
+    # | f(m) | < tol with m the midpoint
+    # between a and b Recursive implementation
+
+    # check if a and b bound a root
+    if np.sign(f(a)) == np.sign(f(b)):
+        raise Exception(
+         "The scalars a and b do not bound a root")
+
+    # get midpoint
+    m = (a + b)/2
+
+    if np.abs(f(m)) < tol:
+        # stopping condition, report m as root
+        return m
+    elif np.sign(f(a)) == np.sign(f(m)):
+        # case where m is an improvement on a.
+        # Make recursive call with a = m
+        return my_bisection(f, m, b, tol)
+    elif np.sign(f(b)) == np.sign(f(m)):
+        # case where m is an improvement on b.
+        # Make recursive call with b = m
+        print("Bisect a:"+str(a)+" and b"+str(b))
+        return my_bisection(f, a, m, tol)
+
+def count_APC_and_detect_dpb(data, times, voltages, delay_ms, duration_ms, AP_threshold_mV, interpol_dt_ms, **args):
+
+    data = data[[times, voltages]].set_index([times])
+    # time point at 80% of stim period
+    t_80pc = delay_ms + duration_ms * 0.8
+    t_100pc = delay_ms + duration_ms
+    depolarization_at_end = data.loc[t_80pc: t_100pc][voltages].mean() > -40
+    AP_count = get_AP_count(
+        data.reset_index(),
+        interpol_dt_ms=interpol_dt_ms,
+        t_on_ms=delay_ms,
+        AP_threshold_mV=AP_threshold_mV
+    )
+    spikes = AP_count > 0
+    return AP_count, (depolarization_at_end and spikes)
+
+def find_intensity_range(i_start_mWPERmm2, sim_control, temp_protocol, analysis_params):
+    """
+    Find stimulation intensity that causes sinle spike threshold response.
+    """
+    sim = lambda i : simulate(
+        i, sim_control, temp_protocol, analysis_params['AP_threshold_mV']
+    )
+    i = i_start_mWPERmm2
+    search = True
+    cnt = 0
+    while search:
+        sim_data = sim(i)
+        APC, dpb = count_APC_and_detect_dpb(
+            sim_data, times='time [ms]', voltages='V_soma(0.5)',
+            **temp_protocol, **analysis_params
+        )
+        print("Tested i={:.2f}".format(i))
+        print("APC={:.2f}, depolarization block: ".format(APC)+str(dpb))
+        i_old = i
+        if dpb:
+            i/=1000
+        elif APC == 0:
+            i*=10
+        elif APC > 0:
+            break
+        cnt +=1
+        if cnt > 1e6:
+            print("Not found after {:i} iterations".format(cnt))
+            return None
+    if APC == 1:
+        i1 = i_old
+    elif APC > 1:
+        iL1 = i_old
+        # bisection between a and b:
+        a = i_start_mWPERmm2
+        b=iL1
+        if a >= b:
+            print("Finding intensity for below threshold response.")
+            i = b
+            while True:
+                sim_data = sim(i)
+                APC, dpb = count_APC_and_detect_dpb(
+                    sim_data, times='time [ms]', voltages='V_soma(0.5)',
+                    **temp_protocol, **analysis_params
+                )
+                print("Tested i={:.2f}".format(i))
+                print("APC={:.2f}, depolarization block: ".format(APC)+str(dpb))
+                if APC == 0:
+                    a = i
+                    break
+                else:
+                    i /= 10
+        sim_APC_m1 = lambda i : count_APC_and_detect_dpb(sim(i),
+            times='time [ms]', voltages='V_soma(0.5)', **temp_protocol, **analysis_params)[0] - 1
+        print("Starting Bisection between a="+str(a)+" and b="+str(b))
+        i1 = my_bisection(f=sim_APC_m1, a=a, b=b, tol=0.1)
+    else:
+        print(APC)
+    return i1
