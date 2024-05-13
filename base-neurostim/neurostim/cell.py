@@ -29,6 +29,11 @@ class Cell:
         """
         self.model = model[0]
         self.h_obj = model[1]
+        self.sim_tree = model[2]
+        if self.sim_tree != None:
+            self.sections = [item[1] for item in self.sim_tree.sections.items()]
+        else:
+            self.sections = list(h.allsec())
         self._distribute_ChR_density(
             ChR_soma_density=ChR_soma_density,
             distribution=ChR_distribution
@@ -37,7 +42,7 @@ class Cell:
 
     def _assign_pos_chanrhod(self):
         """Assign x, y, and z chanrhod to neuron section"""
-        for sec in list(h.allsec()):
+        for sec in self.sections:
             if h.ismembrane("chanrhod", sec=sec):
                 try:
                     n = sec.n3d()
@@ -121,7 +126,7 @@ class Cell:
             derivation in 'metadata/CoChR_expression_levels_Shemesh_et_al2021.ipynb'.
                      
         """
-        for sec in h.allsec():
+        for sec in self.sections:
             if h.ismembrane("chanrhod", sec=sec):
                 for seg in sec:
                     distance_from_soma_center = h.distance(self.model.soma_sec(0.5), seg)  # um
