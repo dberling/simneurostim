@@ -100,3 +100,40 @@ def rm_mech(mech, sec):
     mt = h.MechanismType(0)
     mt.select(mech)
     mt.remove(sec=sec)
+    
+def drop_single_val_indexes(df):
+    """
+    Drops all index columns which only contain a single level value.
+    """
+    lvls_to_drop = [lvl_idx for lvl_idx, lvl_name in enumerate(df.index.names)\
+                    if len(df.index.get_level_values(lvl_idx).unique()) == 1]
+    return df.droplevel(lvls_to_drop)
+    lvls_to_drop = [lvl_idx for lvl_idx, lvl_name in enumerate(df.index.names)\
+                    if len(df.index.get_level_values(lvl_idx).unique()) == 1]
+    return df.droplevel(lvls_to_drop)
+
+def find_depth(cellname, sections):
+    # highest point in neuron's morphology:
+    max_cell_height = np.max([sec.z3d(i) for sec in sections for i in range(sec.n3d())])
+    # assume cortical layer boundaries from Stepanyants 2008 (cat V1)
+    clb = [0, 150, 630, 950, 1200, 1520]
+    mean_layer_depth = np.array([bound for bound in clb[:-1]]) + np.diff(clb)/2
+    # find out which layer:
+    if 'L1' in cellname[:4]:
+        depth = mean_layer_depth[0]
+    elif 'L23' in cellname[:4]:
+        depth = mean_layer_depth[1]
+    elif 'L4' in cellname[:4]:
+        depth = mean_layer_depth[2]
+    elif 'L5' in cellname[:4]:
+        depth = mean_layer_depth[3]
+    elif 'L6' in cellname[:4]:
+        depth = mean_layer_depth[4]
+    # enforce that apical dendrite ends always at least 50 um distant to surface
+    min_depth_to_accommodate_apical_dend = max_cell_height + 50
+    if depth <= min_depth_to_accommodate_apical_dend:
+        print("Set depth to {} um to accommodate apical dendrite. This is {} deeper than mean depth of layer.".format(
+            min_depth_to_accommodate_apical_dend, min_depth_to_accommodate_apical_dend - depth)
+        )
+        depth = min_depth_to_accommodate_apical_dend
+    return depth

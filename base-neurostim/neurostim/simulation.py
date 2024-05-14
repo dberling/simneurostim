@@ -103,7 +103,7 @@ class SimControl:
         rec_var_measures_dict = {}
         for var_name, var_pointer in zip(rec_vars[0], rec_vars[1]):
             rec_var_measures_dict[var_name] = h.Vector()
-            rec_var_measures_dict[var_name].record(eval(var_pointer))
+            rec_var_measures_dict[var_name].record(var_pointer)
         h.tstop = temp_protocol['total_rec_time_ms']
         h.v_init = -71.0442766389535 #mV
         h.run()

@@ -1,107 +1,80 @@
 from neuron import h
-import os
-from neurostim.utils import arbitrary_3d_rotation_along_axis
-from neurostim.utils import rm_mech
 import numpy as np
+
+"""
+model:
+    load hoc
+    solve cortical depth
+    rotation
+    insertion of biophysics including ChR
+"""
 
 class Cell:
     def __init__(
         self,
-        hoc_file,
-        cortical_depth=None,
-        ChR_soma_density=13e9,
-        ChR_distribution="uniform",
-        rm_mech_from_secs=None,
+        model,
+        ChR_soma_density,
+        ChR_distribution,
     ):
         """
         Parameters:
         -----------
 
-        hoc_file: str
-            name of hoc file from which cell is loaded
-        cortical_depth: dict
-            Dictionary with name of cell ('L23' or 'L5') and corresponding
-            depth of soma in cortical column measured from the surface
+        model: object(, optional: h. object)
+            model object(s) as returned from functions defined in models.py
         ChR_soma_density: float
             ChR density in soma in 1/cm2, Foutz et al use 13e9 /cm2
         ChR_distribution: {'uniform', 'shemesh_fig1m_untrgtd', shemesh_fig1n_trgtd'}
             Type of distribution to distirbute the ChR channels over the morphology
-        rm_mech_from_secs: [list of str, list of str]
-            List containing on the first position a list of the mechanisms to remove,
-            e.g. 'na' and secs from which these mechansisms are removed on the second
-            position, e.g., 'h.soma'
         """
-        self.hoc_file = hoc_file
-        allowed_hoc = [
-            "L23.hoc",
-            "L23soma.hoc",
-            "L5.hoc",
-        ]
-        self.allowed_hoc_files = [os.path.join("simneurostim/model", "hoc", h) for h in allowed_hoc]
-        self._construct_cell(hoc_file)
-        self._rotate_in_vertical_position()
-        self._move_to_cortical_position(cortical_depth)
+        self.model = model[0]
+        self.h_obj = model[1]
+        self.sim_tree = model[2]
+        if self.sim_tree != None:
+            self.sections = [item[1] for item in self.sim_tree.sections.items()]
+        else:
+            self.sections = list(h.allsec())
         self._distribute_ChR_density(
             ChR_soma_density=ChR_soma_density,
             distribution=ChR_distribution
         )
         self._assign_pos_chanrhod()
-        self.segs_coord = self.get_segs_coord_dict()
-        self.soma_child_relations = self._get_soma_child_relations()
-        if rm_mech_from_secs != None:
-            for mech in rm_mech_from_secs[0]:
-                for sec in rm_mech_from_secs[1]:
-                    rm_mech(mech, eval(sec))
-
-    def _construct_cell(self, hoc_file):
-        h.load_file(hoc_file)
 
     def _assign_pos_chanrhod(self):
         """Assign x, y, and z chanrhod to neuron section"""
-        for sec in list(h.allsec()):
+        for sec in self.sections:
             if h.ismembrane("chanrhod", sec=sec):
-                n = sec.n3d()
-                x = h.Vector(n)
-                y = h.Vector(n)
-                z = h.Vector(n)
-                len = h.Vector(n)
-                for i in range(n):
-                    x.x[i] = sec.x3d(i)
-                    y.x[i] = sec.y3d(i)
-                    z.x[i] = sec.z3d(i)
-                    len.x[i] = sec.arc3d(i)
-                len.div(len.x[n - 1])
-                r = h.Vector(sec.nseg + 2)
-                r.indgen(1.0 / sec.nseg)
-                r.sub(1.0 / (2.0 * sec.nseg))
-                r.x[0] = 0
-                r.x[sec.nseg + 1] = 1
-                x_int = h.Vector(sec.nseg + 2)
-                y_int = h.Vector(sec.nseg + 2)
-                z_int = h.Vector(sec.nseg + 2)
-                x_int.interpolate(r, len, x)
-                y_int.interpolate(r, len, y)
-                z_int.interpolate(r, len, z)
-                for i in range(1, sec.nseg + 1):
-                    xr = r.x[i]
-                    sec(xr).x_chanrhod = x_int.x[i]
-                    sec(xr).y_chanrhod = y_int.x[i]
-                    sec(xr).z_chanrhod = z_int.x[i]
-
-    def _get_soma_child_relations(self):
-        """
-        Get soma children segments and their parent segment.
-
-        Returns:
-            array of tuples: children segs on 1st pos, corresponding
-                             soma segs on 2nd positon
-        """
-        assert (
-            h.soma in h.allsec()
-        ), "Construct cell before requesting children and soma relationships."
-        soma_childsegs = [sec(0.001) for sec in h.soma.children()]
-        parentsegs = [sec.parentseg() for sec in h.soma.children()]
-        return list(zip(soma_childsegs, parentsegs))
+                try:
+                    n = sec.n3d()
+                    x = h.Vector(n)
+                    y = h.Vector(n)
+                    z = h.Vector(n)
+                    length = h.Vector(n)
+                    for i in range(n):
+                        x.x[i] = sec.x3d(i)
+                        y.x[i] = sec.y3d(i)
+                        z.x[i] = sec.z3d(i)
+                        length.x[i] = sec.arc3d(i)
+                    length.div(length.x[n - 1])
+                    r = h.Vector(sec.nseg + 2)
+                    r.indgen(1.0 / sec.nseg)
+                    r.sub(1.0 / (2.0 * sec.nseg))
+                    r.x[0] = 0
+                    r.x[sec.nseg + 1] = 1
+                    x_int = h.Vector(sec.nseg + 2)
+                    y_int = h.Vector(sec.nseg + 2)
+                    z_int = h.Vector(sec.nseg + 2)
+                    x_int.interpolate(r, length, x)
+                    y_int.interpolate(r, length, y)
+                    z_int.interpolate(r, length, z)
+                    for i in range(1, sec.nseg + 1):
+                        xr = r.x[i]
+                        sec(xr).x_chanrhod = x_int.x[i]
+                        sec(xr).y_chanrhod = y_int.x[i]
+                        sec(xr).z_chanrhod = z_int.x[i]
+                except IndexError:
+                    print(sec)
+                    pass
 
     def _get_ChR_expression_level(self, distance_from_soma, distribution):
         """
@@ -153,264 +126,14 @@ class Cell:
             derivation in 'metadata/CoChR_expression_levels_Shemesh_et_al2021.ipynb'.
                      
         """
-        for sec in h.allsec():
+        for sec in self.sections:
             if h.ismembrane("chanrhod", sec=sec):
                 for seg in sec:
-                    distance_from_soma_center = h.distance(h.soma(0.5), seg)  # um
+                    distance_from_soma_center = h.distance(self.model.soma_sec(0.5), seg)  # um
                     seg.channel_density_chanrhod = ChR_soma_density * self._get_ChR_expression_level(
                         distance_from_soma_center, distribution=distribution
                     )
         return None
-
-    def get_segs_coord_dict(self):
-        """get dictionary of segments extremes/points inside the sections
-
-        Returns:
-            dict : key is the section name, value is a list of 3 entries list
-            containing the coordinates (x,y,z) of each point in the section
-        """
-        segs_coord = {}
-        for sec in list(h.allsec()):
-            segs_coord[sec.name()] = [
-                [sec.x3d(i), sec.y3d(i), sec.z3d(i)] for i in range(sec.n3d())
-            ]
-        return segs_coord
-
-    def _rotate_in_vertical_position(self):
-        """Rotate cell so that z is the vertical axis"""
-        assert (
-            self.hoc_file in self.allowed_hoc_files
-        ), "hoc file not in the list of the allowed ones"
-        if "L23" in self.hoc_file:
-            axis = "x"
-            angle = np.pi / 2
-        if "L5" in self.hoc_file:
-            axis = "y"
-            angle = np.pi / 2
-        for sec in h.allsec():
-            for i in range(sec.n3d()):
-                pos = [sec.x3d(i), sec.y3d(i), sec.z3d(i)]
-                rot_pos = arbitrary_3d_rotation_along_axis(pos, axis, angle)
-                h.pt3dchange(i, *rot_pos, sec.diam3d(i), sec=sec)
-
-    def _move_to_cortical_position(self, cortical_depth):
-        assert (
-            self.hoc_file in self.allowed_hoc_files
-        ), "hoc file not in the list of the allowed ones"
-        if cortical_depth == None:
-            if "L23" in self.hoc_file:
-                self.cortical_depth = 400
-            if "L5" in self.hoc_file:
-                self.cortical_depth = 1150
-            print(
-                "Warning: Parameter cortical_depth not given when cell was initialized. The parameter was set to %4f um."
-                % self.cortical_depth
-            )
-        else:
-            if "L23" in self.hoc_file:
-                self.cortical_depth = cortical_depth["L23"]
-            if "L5" in self.hoc_file:
-                self.cortical_depth = cortical_depth["L5"]
-        for sec in h.allsec():
-            for i in range(sec.n3d()):
-                cortex_pos = [sec.x3d(i), sec.y3d(i), sec.z3d(i) - self.cortical_depth]
-                h.pt3dchange(i, *cortex_pos, sec.diam3d(i), sec=sec)
-
-    def plot_cell_mapped(
-        self,
-        df_seg_to_plot_var,
-        var_to_plot,
-        time,
-        norm_axis_view_plane="y",
-        scaling=0.1,
-        cmap=None,
-        ax=None,
-        clim=None,
-    ):
-        from matplotlib.collections import LineCollection
-        from matplotlib import pyplot as plt
-
-        if norm_axis_view_plane == "x":
-            norm_axis_view_plane = 0
-        if norm_axis_view_plane == "y":
-            norm_axis_view_plane = 1
-        if norm_axis_view_plane == "z":
-            norm_axis_view_plane = 2
-        plotted_axes = np.delete(["x", "y", "z"], norm_axis_view_plane, axis=0)
-
-        start_end_coords = []
-        diams = []
-        data = []
-        for sec in h.allsec():
-            if "Light_source" not in sec.name():
-                dsegrange = 1.0 / sec.nseg
-                segs_in_sec = [seg for seg in sec]
-                for i in range(sec.nseg):
-                    start = (
-                        sec(i * dsegrange).x_chanrhod,
-                        sec(i * dsegrange).y_chanrhod,
-                        sec(i * dsegrange).z_chanrhod,
-                    )
-                    end = (
-                        sec((i + 1) * dsegrange).x_chanrhod,
-                        sec((i + 1) * dsegrange).y_chanrhod,
-                        sec((i + 1) * dsegrange).z_chanrhod,
-                    )
-                    start_end_coords.append([start, end])
-                    diams.append(segs_in_sec[i].diam)
-                    data.append(
-                        df_seg_to_plot_var.loc[time, str(segs_in_sec[i])][var_to_plot]
-                    )
-
-        lines = np.delete(start_end_coords, norm_axis_view_plane, axis=2)
-        if not cmap:
-            from matplotlib.cm import Blues as cmap
-        if not clim:
-            clim = [np.min(data), np.max(data)]
-        norm_data = (np.array(data) - clim[0]) / (clim[1] - clim[0])
-
-        collection = LineCollection(
-            segments=lines, linewidths=np.array(diams) * scaling, colors=cmap(norm_data)
-        )
-        if ax == None:
-            ax = plt.gca()
-        ax.add_collection(collection, autolim=True)
-        ax.axis("equal")
-        ax.set_xlabel("".join([plotted_axes[0], "-axis [um]"]))
-        ax.set_ylabel("".join([plotted_axes[1], "-axis [um]"]))
-        ax.set_title(
-            "".join(
-                [
-                    self.hoc_file,
-                    " - viewing axis: ",
-                    ["x", "y", "z"][norm_axis_view_plane],
-                ]
-            )
-        )
-        return ax, collection
-
-    def plot_fine(
-        self, norm_axis_view_plane="y", scaling=1, color="tab:blue", ax=None
-    ):
-        from matplotlib.collections import LineCollection
-        from matplotlib import pyplot as plt
-
-        if norm_axis_view_plane == "x":
-            norm_axis_view_plane = 0
-        if norm_axis_view_plane == "y":
-            norm_axis_view_plane = 1
-        if norm_axis_view_plane == "z":
-            norm_axis_view_plane = 2
-        plotted_axes = np.delete(["x", "y", "z"], norm_axis_view_plane, axis=0)
-
-        start_end_coords = []
-        diams = []
-        data = []
-        for sec in h.allsec():
-            if "Light_source" not in sec.name():
-                dsegrange = 1.0 / sec.nseg
-                segs_in_sec = [seg for seg in sec]
-                for i in range(sec.nseg):
-                    start = (
-                        sec(i * dsegrange).x_chanrhod,
-                        sec(i * dsegrange).y_chanrhod,
-                        sec(i * dsegrange).z_chanrhod,
-                    )
-                    end = (
-                        sec((i + 1) * dsegrange).x_chanrhod,
-                        sec((i + 1) * dsegrange).y_chanrhod,
-                        sec((i + 1) * dsegrange).z_chanrhod,
-                    )
-                    start_end_coords.append([start, end])
-                    diams.append(segs_in_sec[i].diam)
-
-        lines = np.delete(start_end_coords, norm_axis_view_plane, axis=2)
-
-        collection = LineCollection(
-            segments=lines, linewidths=np.array(diams) * scaling, colors=color
-        )
-        if ax == None:
-            ax = plt.gca()
-        ax.add_collection(collection, autolim=True)
-        ax.axis("equal")
-        ax.set_xlabel("".join([plotted_axes[0], "-axis [um]"]))
-        ax.set_ylabel("".join([plotted_axes[1], "-axis [um]"]))
-        ax.set_title(
-            "".join(
-                [
-                    self.hoc_file,
-                    " - viewing axis: ",
-                    ["x", "y", "z"][norm_axis_view_plane],
-                ]
-            )
-        )
-        return ax, collection
-
-    def plot(
-        self,
-        norm_axis_view_plane="y",
-        scaling=0.1,
-    ):
-        from matplotlib.collections import LineCollection
-        from matplotlib import pyplot as plt
-
-        if norm_axis_view_plane == "x":
-            norm_axis_view_plane = 0
-        if norm_axis_view_plane == "y":
-            norm_axis_view_plane = 1
-        if norm_axis_view_plane == "z":
-            norm_axis_view_plane = 2
-        plotted_axes = np.delete(["x", "y", "z"], norm_axis_view_plane, axis=0)
-
-        seg_start_end_coords = []
-        seg_diams = []
-        for sec in h.allsec():
-            sec_start = [sec.x3d(0), sec.y3d(0), sec.z3d(0)]
-            sec_intermed_nodes = np.array(
-                [[sec.x3d(i), sec.y3d(i), sec.z3d(i)] for i in range(1, sec.n3d)]
-            )
-            sec_intermed_nodes[:-1] += np.diff(sec_intermed_nodes, axis=0) / 2
-            sec_end = [
-                sec.x3d(sec.nseg + 1),
-                sec.y3d(sec.nseg + 1),
-                sec.z3d(sec.nseg + 1),
-            ]
-            sec_start_inter_end_coords = (
-                sec_start + list(sec_intermed_nodes[:-1]) + sec_end
-            )
-            for i in range(sec.nseg):
-                seg_start_end_coords.append(
-                    [sec_start_inter_end_coords[i], sec_start_inter_end_coords[i + 1]]
-                )
-            [seg_diams.append(seg.diam) for seg in sec]
-
-        lines = []
-        for seg_start, seg_end in seg_start_end_coords:
-            lines.append(
-                np.delete(
-                    [seg_start, seg_end],
-                    norm_axis_view_plane,
-                    axis=1,
-                )
-            )
-
-        collection = LineCollection(
-            segments=lines, linewidths=np.array(seg_diams) * scaling, colors="tab:blue"
-        )
-        plt.gca().add_collection(collection, autolim=True)
-        plt.axis("equal")
-        plt.xlabel("".join([plotted_axes[0], "-axis"]))
-        plt.ylabel("".join([plotted_axes[1], "-axis"]))
-        plt.title(
-            "".join(
-                [
-                    self.hoc_file,
-                    " - viewing axis: ",
-                    ["x", "y", "z"][norm_axis_view_plane],
-                ]
-            )
-        )
-        return plt.gca()
 
     def build_tree(self, func,segfunc=False):
         """ func must act on a neuron section
@@ -522,7 +245,4 @@ class Cell:
             collection = LineCollection(segments = array(segments)[::-1],
                                         linewidths = (diam*scaling)[::-1],
                                         colors=colors[::-1], norm=norm)
-        #if cmap:
-        #    collection.set_array(data)
-        #    collection.set_clim(clim[0], clim[1])
         return collection

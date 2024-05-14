@@ -166,7 +166,7 @@ def simple_polar_map(
     mappable = ax.pcolormesh(
         ang_mesh,
         rmesh,
-        data.pivot("angle [rad]", "radius [um]", plot_col).values,
+        data.pivot(index="angle [rad]", columns="radius [um]", values=plot_col).values,
         cmap=cmap,
         shading="nearest",
         **pcolormesh_kwargs
