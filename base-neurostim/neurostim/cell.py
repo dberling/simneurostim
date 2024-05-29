@@ -29,7 +29,9 @@ class Cell:
         """
         self.model = model[0]
         self.h_obj = model[1]
-        self.sim_tree = model[2]
+        if model[2] != None:
+            self.sim_tree = model[2][0]
+            self.ph_tree = model[2][1]
         if self.sim_tree != None:
             self.sections = [item[1] for item in self.sim_tree.sections.items()]
         else:
