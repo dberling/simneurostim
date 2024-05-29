@@ -103,7 +103,7 @@ def L5_catV1():
             soma_sec='soma'
     )
     cell.modelname = 'L5_catV1'
-    return cell, None
+    return cell, None, None
 
 def L23_catV1():
     """
@@ -124,7 +124,7 @@ def L23_catV1():
             soma_sec='soma'
     )
     cell.modelname = 'L23_catV1'
-    return cell, None
+    return cell, None, None
 
 def L5_Hay2011(cell):
     """
@@ -162,42 +162,42 @@ def L5_Hay2011(cell):
             soma_sec='L5PCtemplate[0].soma[0]'
     )
     cell.modelname = 'L5_Hay2011'
-    return cell, h_model_object
+    return cell, h_model_object, None
 
 def L5_Hay2011_cell1():
     return L5_Hay2011(cell='cell1')
 def L5_Hay2011_cell2():
     return L5_Hay2011(cell='cell2')
 def L5_Hay2011_cell2_vertical_shaft():
-    cell, _ = L5_Hay2011(cell='cell2')
+    cell, _1, _2 = L5_Hay2011(cell='cell2')
     cell.rotation = dict(
             axis = 'y',
             angle = -1*np.pi/16
     )
     cell._rotate()
     cell._move_to_soma_position(soma_xyz=[0, 0, -1100])
-    return cell, _
+    return cell, _1, _2
 def L5_Hay2011_cell2_vertical_shaft_10higherapicsod():
-    cell, hoc_obj = L5_Hay2011_cell2_vertical_shaft()
+    cell, hoc_obj, _ = L5_Hay2011_cell2_vertical_shaft()
     for sec in h.allsec():
         if 'apic' in str(sec) and sec.has_membrane('NaTa_t'):
             sec.gNaTa_tbar_NaTa_t *= 10
-    return cell, hoc_obj
+    return cell, hoc_obj, None
 def L5_Hay2011_cell2_vertical_shaft_2higherapicsod():
-    cell, hoc_obj = L5_Hay2011_cell2_vertical_shaft()
+    cell, hoc_obj, _ = L5_Hay2011_cell2_vertical_shaft()
     for sec in h.allsec():
         if 'apic' in str(sec) and sec.has_membrane('NaTa_t'):
             sec.gNaTa_tbar_NaTa_t *= 2
-    return cell, hoc_obj
+    return cell, hoc_obj, None
 def L5_Hay2011_cell2_vertical_shaft_5higherapicsod():
-    cell, hoc_obj = L5_Hay2011_cell2_vertical_shaft()
+    cell, hoc_obj, _ = L5_Hay2011_cell2_vertical_shaft()
     for sec in h.allsec():
         if 'apic' in str(sec) and sec.has_membrane('NaTa_t'):
             sec.gNaTa_tbar_NaTa_t *= 5
-    return cell, hoc_obj
+    return cell, hoc_obj, None
 
 def NeatCellModel(modelname, passified_dendrites, 
-    comp_channels_name):
+    comp_channels_name,apical_na_dens_factor=False):
     """
     Load Models from BBP-based NEAT-models implemented by
     Joshua Boettcher and Willem Wybo in NEAST_models repo
@@ -210,6 +210,8 @@ def NeatCellModel(modelname, passified_dendrites,
         whether to passify dendrites through NEAT or not.
     comp_channels_name: str
         name assigned to compiled ion channels (mod files)
+    apical_na_dens_factor: False / float
+        factor by which to multiply sodium density in apical dend
 
     returns:
     --------
@@ -230,6 +232,10 @@ def NeatCellModel(modelname, passified_dendrites,
     # import neat cell dict with cell parameters
     exec(' '.join(['from', 'neat_dicts.'+modelname, 'import', modelname+'_config']))
     neat_cell_dict = eval(modelname+'_config')
+    # change apical na density:
+    if apical_na_dens_factor:
+        neat_cell_dict['gbar_NaTs2_t_apical'] *= apical_na_dens_factor
+        print("Changed apical density by factor: " + str(apical_na_dens_factor))
     # load compiled mod files
     neat.loadNeuronModel(comp_channels_name)
 
@@ -263,7 +269,7 @@ def NeatCellModel(modelname, passified_dendrites,
             soma_nrn_sec=sim_tree.sections[1]
     )
     cell.modelname = modelname
-    return cell, None, sim_tree
+    return cell, None, (sim_tree, model.ph_tree)
 
 # dynamic definition of BBPmodels as functions
 BBPcells_to_be_defined = [
