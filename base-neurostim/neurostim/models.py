@@ -277,7 +277,7 @@ BBPcells_to_be_defined = [
 def create_BBPmodel_function(funcname,pass_dends):
     def wrapper():
         return NeatCellModel(
-                modelname=funcname, passified_dendrites=pass_dends, comp_channels_name="BBPChannelsChR2"
+                modelname=funcname, passified_dendrites=pass_dends, comp_channels_name="bbpchannels"
         )
     return wrapper
 
