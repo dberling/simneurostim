@@ -304,13 +304,15 @@ def find_xAPC50(df):
     x_APC50_outmost = np.max(radii_interpolated[np.abs(APC_interpolated-df.AP_count.max()/2)<tolerance])
     return x_APC50_outmost
 
-def improved_find_xAPC50_over_lps(df, groupby=None):
+def improved_find_xAPC50_over_lps(df, groupby=None, apply_to='AP_count'):
     """
     Find response radius (APC50) and peak response (APCmax).
     - avrg over angle
     - groupby (w/o radius)
     - calc rr and pr
     """
+    if apply_to != 'AP_count':
+        df = df.rename(columns={apply_to: 'AP_count'})
     if groupby == None:
         groupby = [
             'hoc_file', 'light_model', 'chanrhod_distribution', 'chanrhod_expression',
@@ -322,6 +324,8 @@ def improved_find_xAPC50_over_lps(df, groupby=None):
         rad_label = 'radius [um]'
     else:
         raise ValueError("Cannot detect radius column in dataframe df.")
+    # make radius column dtype int
+    df['radius [um]'] = df['radius [um]'].astype('int64')
     # avrg angles
     df_angavrg = df.groupby(groupby+[rad_label]).mean()
     # calc peak response
@@ -329,5 +333,5 @@ def improved_find_xAPC50_over_lps(df, groupby=None):
     # calc response radius
     xAPC50 = df_angavrg.groupby(groupby).apply(lambda x:find_xAPC50(x.reset_index()))
     
-    spres = pd.DataFrame(APCmax).join(pd.DataFrame(xAPC50, columns=['xAPC50'])).rename(columns={'AP_count':'APCmax'})
+    spres = pd.DataFrame(APCmax).join(pd.DataFrame(xAPC50, columns=['xAPC50'])).rename(columns={apply_to:'APCmax'})
     return spres
