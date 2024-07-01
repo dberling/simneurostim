@@ -20,8 +20,9 @@ class Cell:
         Parameters:
         -----------
 
-        model: object(, optional: h. object)
+        model: list
             model object(s) as returned from functions defined in models.py
+            for example: [cell object, h. object, Neat-tree objects] 
         ChR_soma_density: float
             ChR density in soma in 1/cm2, Foutz et al use 13e9 /cm2
         ChR_distribution: {'uniform', 'shemesh_fig1m_untrgtd', shemesh_fig1n_trgtd'}
