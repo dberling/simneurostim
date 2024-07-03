@@ -21,7 +21,7 @@ def fiber_Foutz2012(x, y, z, diameter_um, NA, spreading=True, scattering=True,
         scatter coeff in 1/mm, defaults to 7.37 from FOutz et al. 2012
     absorbance_coefficient: float
         absorbance coeff in 1/mm, defaults to 0.1249 from Foutz et al. 2012
-    returns normalized intensity in W/cm2
+    returns normalized intensity in 1/cm2
     """
     # make z always positive to ensure correct light profile
     # whether positive or negative z axis are considered
