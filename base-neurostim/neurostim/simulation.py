@@ -68,7 +68,14 @@ class SimControl:
         )
         return sim_data
 
-    def run(self, temp_protocol, stim_location, stim_intensity_mWPERmm2, rec_vars, interpol_dt_ms):
+    def run(self, 
+            temp_protocol, 
+            stim_location, 
+            stim_intensity_mWPERmm2, 
+            rec_vars, 
+            interpol_dt_ms,
+            norm_power_mW_of_MultiStimulator=None
+            ):
         """
         Run simulation.
 
@@ -78,21 +85,37 @@ class SimControl:
             Dictionary containing "duration_ms", "delay_ms", "total_rec_time_ms"
         stim_location: tuple;
             Tuple containing (x_um, y_um, z_um) of stimulator in um
-        stim_intensity_mWPERmm2: float;
-            Stimulation intensity at stimulator output surface in mW/mm2
+        stim_intensity_mWPERmm2: float/None;
+            Stimulation intensity at stimulator output surface in mW/mm2.
+            Works only for single stimulator. Should be None for MultiStimulator.
         rec_vars: tuple;
             Tuple containing recording variable names and pointers
             (variable_names (List of str), variable_pointers (List of hoc pointers)
         interpol_dt_ms: float;
             time step to interpolate results with.
+        norm_power_mW_of_MultiStimulator: float/None;
+            Power which is applied to each stimulator of a MultiStimulator and
+            weighted by the intensity_scale variable given for each stimulator. 
 
         Returns Pandas DataFrame with recordings
         """
         assert len(rec_vars[0]) == len(rec_vars[1]), "Recording variable names and pointers don't have the same dimenstion"
         # communicate stim_intensity to ostim.mod
-        # convert to power of the stimulator [W]:
-        self.stim.power_W = stim_intensity_mWPERmm2\
-            * (self.stimulator.diameter_um/2*1e-3)**2*np.pi*1e-3
+        if stim_intensity_mWPERmm2 != None:
+            assert norm_power_mW_of_MultiStimulator == None,\
+                "If using single stimulator, norm_power_mW_of_MultiStimulator should be set to None\
+                 Use stim_intensity_mWPERmm2 instead to set light intensity."
+            # assume single stimulator
+            # convert to power of the stimulator [W]:
+            self.stim.power_W = stim_intensity_mWPERmm2\
+                * (self.stimulator.diameter_um/2*1e-3)**2*np.pi*1e-3
+        elif norm_power_mW_of_MultiStimulator != None:
+            assert stim_intensity_mWPERmm2 == None,\
+                "If using MultiStimulator, stim_intensity_mWPERmm2 should be set to None.\
+                 Use norm_power_mW_of_MultiStimulator instead to light power."
+            # assume MultiStimulator:
+            self.stim.power_W = norm_power_mW_of_MultiStimulator * 1e-3
+
         self.stim.dur = temp_protocol['duration_ms']
         self.stim.delay = temp_protocol['delay_ms']
         # calculate light intensity at segments

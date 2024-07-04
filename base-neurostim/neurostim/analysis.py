@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from neuron import h
 from neurostim.cell import Cell
-from neurostim.stimulator import Stimulator
+from neurostim.stimulator import Stimulator, MultiStimulator
 from neurostim.simulation import SimControl
 from neurostim.utils import convert_polar_to_cartesian_xz
 from neurostim import models
@@ -165,6 +165,42 @@ def simulate_spatial_profile(
             radii_um, angles_rad
     )
     return spatial_profile_df
+
+def simulate_spatial_profile_new(
+    simcontrol,
+    radii_um,
+    angles_rad,
+    stim_intensity_mWPERmm2,
+    temp_protocol,
+    rec_vars,
+    interpol_dt_ms
+    ):
+    """
+    For docs see simulate_spatial_profile.
+    """
+    # simulate for all radius and angle combinations
+    results = []
+    for radius in radii_um:
+        for angle in angles_rad:
+            stim_x_um, stim_y_um = convert_polar_to_cartesian_xz(radius, angle)
+            stim_z_um = 0  # cortical surface
+            # run simulation
+            try:
+                sim_data = simcontrol.run(
+                    temp_protocol=temp_protocol,
+                    stim_location=(stim_x_um, stim_y_um, stim_z_um),
+                    stim_intensity_mWPERmm2=stim_intensity_mWPERmm2,
+                    rec_vars=rec_vars,
+                    interpol_dt_ms=interpol_dt_ms,
+                )
+                sim_data['radius_um'] = radius_um
+                sim_data['angle_rad'] = angle_rad
+                results.append(sim_data)
+            except RuntimeError:
+                print("NEURON experienced RuntimeError")
+                print("radius_um was", radius_um)
+                print("angle_rad was", angle_rad)
+    return pd.concat(results)
 
 def simulate_spatial_profile_wo_NEURONsetup(
     cell, cell_dict, stimulator, segs, temp_protocol, stim_intensity_mWPERmm2, seg_rec_vars, interpol_dt_ms,
@@ -360,6 +396,29 @@ def quick_sim_setup(cell_dict,stimulator_dict):
     )
     return simcontrol
 
+def quick_sim_setup_MultiStim(cell_dict, stimulator_config):
+    """
+    Quick setup of simulation.
+    """
+    # NEURON setup
+    h.load_file("stdrun.hoc")
+    h.cvode_active(1)
+    # load model
+    cellmodel = getattr(models,cell_dict['cellmodel'])
+    cell = Cell(
+        model=cellmodel(),
+        ChR_soma_density = cell_dict['ChR_soma_density'],
+        ChR_distribution=cell_dict['ChR_distribution'],
+    )
+    # init stimulator
+    stimulator = MultiStimulator(stimulator_config)
+    # init simulation
+    simcontrol = SimControl(
+        cell=cell,
+        stimulator=stimulator
+    )
+    return simcontrol
+
 def simulate_APC(stim_intensity_mWPERmm2, simcontrol, temp_protocol, AP_threshold_mV):
     """
     Simulate AP count for stim intensity.
@@ -391,6 +450,30 @@ def simulate(stim_intensity_mWPERmm2, simcontrol, temp_protocol, AP_threshold_mV
         temp_protocol=temp_protocol,
         stim_location=(0,0,0), # center
         stim_intensity_mWPERmm2=stim_intensity_mWPERmm2,
+        rec_vars=[
+            ['time [ms]', 'V_soma(0.5)'],
+            [h._ref_t, simcontrol.cell.model.soma_sec(0.5)._ref_v]
+        ],
+        interpol_dt_ms=interpol_dt_ms,
+    )
+    if plot:
+        sim_data.plot(x='time [ms]', y='V_soma(0.5)')
+    AP_count = get_AP_count(
+        sim_data,
+        interpol_dt_ms=interpol_dt_ms,
+        t_on_ms=temp_protocol['delay_ms'],
+        AP_threshold_mV=AP_threshold_mV
+    )
+    return sim_data
+
+def simulateMultiStim(norm_power_mW_of_MultiStimulator, simcontrol, temp_protocol, AP_threshold_mV, plot=False):
+    
+    interpol_dt_ms = 0.1
+    sim_data = simcontrol.run(
+        temp_protocol=temp_protocol,
+        stim_location=(0,0,0), # center
+        stim_intensity_mWPERmm2=None,
+        norm_power_mW_of_MultiStimulator=norm_power_mW_of_MultiStimulator,
         rec_vars=[
             ['time [ms]', 'V_soma(0.5)'],
             [h._ref_t, simcontrol.cell.model.soma_sec(0.5)._ref_v]
@@ -450,10 +533,14 @@ def count_APC_and_detect_dpb(data, times, voltages, delay_ms, duration_ms, AP_th
     spikes = AP_count > 0
     return AP_count, (depolarization_at_end and spikes)
 
-def find_intensity_range(i_start_mWPERmm2, sim_control, temp_protocol, analysis_params):
+def find_intensity_range(i_start_mWPERmm2, sim_control, temp_protocol, analysis_params, MultiStim=False):
     """
     Find stimulation intensity that causes sinle spike threshold response.
+
+    When MultiStim=True, use light power in mW as start value.
     """
+    if MultiStim:
+        simulate = simulateMultiStim
     sim = lambda i : simulate(
         i, sim_control, temp_protocol, analysis_params['AP_threshold_mV']
     )
