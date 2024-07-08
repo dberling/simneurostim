@@ -225,6 +225,7 @@ def NeatCellModel(modelname, passified_dendrites,
     
     import neat
     from neat.tools.simtools.neuron.neuronmodel import NeuronSimTreeWith3DCoords
+    # from neat.simulations.neuron.neuronmodel import NeuronSimTree
     import sys, os
     sys.path.append(
             os.path.abspath(os.path.dirname("NEAST_models/BBP/")))
@@ -248,15 +249,21 @@ def NeatCellModel(modelname, passified_dendrites,
     # NeuronSimTree for simulating model in NEURON
     sim_tree = model.ph_tree.__copy__(
             new_tree=NeuronSimTreeWith3DCoords()
+            #new_tree=NeuronSimTreeWith()
     )
     sim_tree.initModel(t_calibrate=100.)
     
     # set depth to mean layer depth or if cell 
     # exceeds cortical surface in this case to
     # 50um distance from apical dendrite end to surface
+    # cells are oriented along y axis, use y coords to get cell height:
+    sections = [item[1] for item in sim_tree.sections.items()]
+    soma_apical_cell_height = np.max([
+            sec.y3d(i) for sec in sections for i in range(sec.n3d())
+    ])
     depth = find_depth(
         cellname=modelname, 
-        sections=[item[1] for item in sim_tree.sections.items()]
+        soma_apical_cell_height=soma_apical_cell_height
     )
     # use CellModelTemplate to define cell properties
     cell = CellModelTemplate(

@@ -9,6 +9,11 @@ class SimControl:
         Initialize simulation with cell and stimulator.
         """
         self.cell = cell
+        # assert that cell is placed below cortical surface
+        assert(
+            np.max([sec.z3d(i) for sec in cell.sections for i in range(sec.n3d())]) < 0,
+            "Parts of the cell are placed above the cortical surface!"
+        )
         self.stimulator = stimulator
         # initialize stimualtor in NEURON as section and connect to mod file ostim.mod
         self.stim = h.ostim(0.5, h.Section(name="stimulator"))
