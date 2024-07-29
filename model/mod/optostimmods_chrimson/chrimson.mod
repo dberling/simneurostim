@@ -8,10 +8,11 @@ UNITS {
 }
 
 NEURON { :public interface of the mechanism
-    SUFFIX chrimson :Name of the Channel
+    SUFFIX chanrhod :Name of the Channel
     NONSPECIFIC_CURRENT	icat :Specific Channel for Na, Ca, K
     RANGE flux :photon flux on molecule
     RANGE channel_density :Channel density
+    RANGE gcat : mean channel-conductance times channel_density
     RANGE x, y, z :Location of that segment (of nsegs)
     GLOBAL source_flux :Optical Input
     GLOBAL h, c
@@ -21,15 +22,15 @@ NEURON { :public interface of the mechanism
     GLOBAL ecat : nernst potential for chanrhod
     RANGE Tx : light loss between source and segment
     GLOBAL tstimon, tstimoff
-    GLOBAL O1toC1, O2toC2, O2toS, C2toC1, StoC1
-    GLOABL PhoC1toO1, PhoC2toO2, PhoC1toC2, PhoC2toC1
+    :GLOABL PhoC1toO1, PhoC2toO2, PhoC1toC2, PhoC2toC1
+    :GLOBAL O1toC1, O2toC2, O2toS, C2toC1, StoC1
 }
 
 PARAMETER {
     channel_density        = 1.3e10              (1/cm2) : variable : number of channels per cm2
 
-    gcat1    = 50e-15    (mho)   : (Grossman 2011) 50 fS
-    gcat2    = 250e-17   (mho)   : Figure 8 Nikolic 2009
+    gcat1    =  50e-15    (mho)   : (Grossman 2011) 50 fS for ChR-2
+    gcat2    = 8.5e-15    (mho)   : 0.17*gcat1 (ratio used in Antolik et al. 2021)
 
     ecat     = 0      (mV)     : Nagel 2003
 
@@ -43,11 +44,23 @@ PARAMETER {
     c = 299792458.0          (m/s)      : speed of light
     wavelength = 595e-9
 
+    : rates multiplied by 1000 to account for flux in 1/(ms*cm2) instead of 1/(s*cm2) as in mozaik
+    PhoC1toO1 = 5.4965e-15 
+    PhoC2toO2 = 3.59865e-15
+    PhoC1toC2 = 9.68e-17
+    PhoC2toC1 = 7.19e-16
+
+    O1toC1 = 0.125
+    O2toC2 = 0.015
+    O2toS  = 0.0001
+    C2toC1 = 1e-7
+    StoC1  = 3e-6
 }
 
 ASSIGNED {  :calculated by the mechanism (computed by NEURON)
     v           (mV)
     icat        (mA/cm2)
+    gcat        (mho/cm2)
     source_flux        (photons/ms) : flux of photons exiting optrode per millisecond, from ostim.mod
     flux               (photons/(ms) : number of photons reaching segment per area, from ostim.mod
     tstimon
@@ -64,17 +77,18 @@ INITIAL {
     tstimoff = 0
 
     : STATES
-    C1 = 0.2 :Amount of channels at initial time
-    C2 = 0
+    C1 = 0.8 :Amount of channels at initial time
+    C2 = 0.2
     O1 = 0
     O2 = 0
-    S  = 0.8
+    S  = 0
 }
 
 BREAKPOINT {
     flux      = source_flux * Tx           : (photons/ms) * (1/cm2)
     
-    icat = (O1 * gcat1 + O2 * gcat2) * channel_density * (v-ecat) : mA/cm2
+    gcat = (O1 * gcat1 + O2 * gcat2) * channel_density
+    icat = gcat * (v-ecat) : mA/cm2
 	
     SOLVE states METHOD cnexp
     if (O1>1){O1=1}
