@@ -33,7 +33,7 @@ PARAMETER {
     :     r = 0.1 mm
     :     Irradiance = Af * Psrc/(pi * r**2) = 380 mW/mm2 --> 0.38 W/mm2 --> 38 W/cm2
     power_W = 1                    (W)
-    wavelength = 4.73e-7        (m)
+    wavelength = 5.95e-7        (m)
     h = 6.6260693e-34           (m2 kg/s)  : planck's constant
     c = 299792458.0             (m/s)      : speed of light
 
