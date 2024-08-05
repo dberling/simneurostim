@@ -123,7 +123,7 @@ def calc_rescaled_comp_conductances_nS(
     stimulator_config: list of dict
         MultiStimulator configuration
     comp_data: list
-        data per compartment: secname, sec_x, transfer_resistance_MOhm, x, y, z, area_um2, channel_density_PERcm2
+        data per compartment: secname, sec_x, transfer_resistance_unit?, x, y, z, area_um2, channel_density_PERcm2
     temp_protocol: dict
         duration_ms: int, delay_ms: int, total_rec_time_ms: int
     reject_if_sampling_smaller: float
@@ -148,10 +148,10 @@ def calc_rescaled_comp_conductances_nS(
     photon_flux_source_PER_fs = photon_flux_source_PER_s * 1e-15
     
     # load neuron comp data
-    secname, sec_x, transfer_resistance_MOhm, x, y, z, area_um2, channel_density_PERcm2 = comp_data.T
+    secname, sec_x, transfer_resistance_unittobedef, x, y, z, area_um2, channel_density_PERcm2 = comp_data.T
     #transfer_resistance_GOhm = transfer_resistance_MOhm * 1e-3
     #soma_input_resistance_GOhm = transfer_resistance_GOhm[(secname==1) & (sec_x==0.5)].item()
-    soma_input_resistance_MOhm = transfer_resistance_MOhm[(secname==1) & (sec_x==0.5)].item()
+    soma_input_resistance = transfer_resistance_unittobedef[(secname==1) & (sec_x==0.5)].item()
     N_channel = area_um2 * 1e-8 * channel_density_PERcm2
     
     # load stimulator model
@@ -184,5 +184,5 @@ def calc_rescaled_comp_conductances_nS(
         sampling_period=interpol_dt_ms
     )
     comp_conductance_nS = channel_conductance_nS * np.array(N_channel).reshape((1,len(secname)))
-    rescaled_cond_nS = comp_conductance_nS / (1 + (np.array(transfer_resistance_MOhm).reshape((1,len(secname))) - soma_input_resistance_MOhm) * comp_conductance_nS)
+    rescaled_cond_nS = comp_conductance_nS / (1 + np.abs(np.array(transfer_resistance_unittobedef).reshape((1,len(secname))) - soma_input_resistance) * comp_conductance_nS)
     return rescaled_cond_nS, interpol_dt_ms, True
