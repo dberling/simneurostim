@@ -110,7 +110,8 @@ def calc_rescaled_comp_conductances_nS(
     norm_power_mW_of_MultiStimulator, 
     stimulator_config,
     comp_data, 
-    temp_protocol
+    temp_protocol,
+    reject_if_sampling_smaller=0.001
 ):
     """
     Calculate ChrimsonR condcutance per neuron compartment rescaled to its effect at soma.
@@ -125,11 +126,16 @@ def calc_rescaled_comp_conductances_nS(
         data per compartment: secname, sec_x, transfer_resistance_MOhm, x, y, z, area_um2, channel_density_PERcm2
     temp_protocol: dict
         duration_ms: int, delay_ms: int, total_rec_time_ms: int
+    reject_if_sampling_smaller: float
+        If sampling period falls below this number, reject calculation.
 
     Returns:
     --------
     rescaled_cond_nS: numpy.ndarray
         Rescaled conductances in shape (N_times, N_compartments)
+    interpol_dt_ms: float
+        sampling period in ms
+    completed_flag: bool
     """
     # convert str(list) to real list if needed:
     if type(stimulator_config[0]['position']) == str:
@@ -143,8 +149,9 @@ def calc_rescaled_comp_conductances_nS(
     
     # load neuron comp data
     secname, sec_x, transfer_resistance_MOhm, x, y, z, area_um2, channel_density_PERcm2 = comp_data.T
-    transfer_resistance_GOhm = transfer_resistance_MOhm * 1e-3
-    soma_input_resistance_GOhm = transfer_resistance_GOhm[(secname==1) & (sec_x==0.5)].item()
+    #transfer_resistance_GOhm = transfer_resistance_MOhm * 1e-3
+    #soma_input_resistance_GOhm = transfer_resistance_GOhm[(secname==1) & (sec_x==0.5)].item()
+    soma_input_resistance_MOhm = transfer_resistance_MOhm[(secname==1) & (sec_x==0.5)].item()
     N_channel = area_um2 * 1e-8 * channel_density_PERcm2
     
     # load stimulator model
@@ -163,6 +170,9 @@ def calc_rescaled_comp_conductances_nS(
     
     # generate temporal evolution of stimulation
     interpol_dt_ms = define_sampling(fluxes_photons_PER_cm2_fs)
+    if interpol_dt_ms < reject_if_sampling_smaller:
+        return None, interpol_dt_ms, False
+        # sampling period would be to small
     stimulation_times = np.ones(int(temp_protocol['total_rec_time_ms']/interpol_dt_ms))
     stimulation_times[:int(temp_protocol['delay_ms']/interpol_dt_ms)] = 0
     stimulation_times[int(temp_protocol['duration_ms']/interpol_dt_ms):] = 0
@@ -174,5 +184,5 @@ def calc_rescaled_comp_conductances_nS(
         sampling_period=interpol_dt_ms
     )
     comp_conductance_nS = channel_conductance_nS * np.array(N_channel).reshape((1,len(secname)))
-    rescaled_cond_nS = comp_conductance_nS / (1 + (np.array(transfer_resistance_GOhm).reshape((1,len(secname))) - soma_input_resistance_GOhm) * comp_conductance_nS)
-    return rescaled_cond_nS
+    rescaled_cond_nS = comp_conductance_nS / (1 + (np.array(transfer_resistance_MOhm).reshape((1,len(secname))) - soma_input_resistance_MOhm) * comp_conductance_nS)
+    return rescaled_cond_nS, interpol_dt_ms, True
