@@ -111,6 +111,7 @@ def calc_rescaled_comp_conductances_nS(
     stimulator_config,
     comp_data, 
     temp_protocol,
+    scale_imp,
     reject_if_sampling_smaller=0.001
 ):
     """
@@ -185,4 +186,29 @@ def calc_rescaled_comp_conductances_nS(
     )
     comp_conductance_nS = channel_conductance_nS * np.array(N_channel).reshape((1,len(secname)))
     rescaled_cond_nS = comp_conductance_nS / (1 + np.abs(np.array(transfer_resistance_unittobedef).reshape((1,len(secname))) - soma_input_resistance) * comp_conductance_nS)
-    return rescaled_cond_nS, interpol_dt_ms, True
+    rescaled_cond_nS_scaled = comp_conductance_nS / (1 + np.abs(np.array(transfer_resistance_unittobedef).reshape((1,len(secname))) * scale_imp - soma_input_resistance) * comp_conductance_nS)
+    return rescaled_cond_nS, rescaled_cond_nS_scaled, interpol_dt_ms, True
+
+def calc_rescaled_comp_conductances_nS_with_GOhm_impedances(
+    norm_power_mW_of_MultiStimulator, 
+    stimulator_config,
+    comp_data, 
+    temp_protocol,
+    scale_imp,
+    reject_if_sampling_smaller=0.001
+):
+
+    secname, sec_x, transfer_resistance_unittobedef, x, y, z, area_um2, channel_density_PERcm2 = comp_data.T
+    comp_data_GOhm_impedance = np.array(
+            [secname, sec_x, transfer_resistance_unittobedef*1e-3, 
+             x, y, z, area_um2, channel_density_PERcm2]
+            ).T
+    return calc_rescaled_comp_conductances_nS(
+        norm_power_mW_of_MultiStimulator, 
+        stimulator_config,
+        comp_data_GOhm_impedance, 
+        temp_protocol,
+        scale_imp,
+        reject_if_sampling_smaller=0.001
+    )
+
