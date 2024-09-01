@@ -128,7 +128,7 @@ def find_depth(cellname, soma_apical_cell_height):
     elif 'L6' in cellname[:4]:
         depth = mean_layer_depth[4]
     # enforce that apical dendrite ends always at least 50 um distant to surface
-    min_depth_to_accommodate_apical_dend = soma_apical_cell_height + 50
+    min_depth_to_accommodate_apical_dend = soma_apical_cell_height + 20
     print(min_depth_to_accommodate_apical_dend)
     if depth <= min_depth_to_accommodate_apical_dend:
         print("Set depth to {} um to accommodate apical dendrite. This is {} deeper than mean depth of layer.".format(
