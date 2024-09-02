@@ -33,6 +33,10 @@ class Cell:
         if model[2] != None:
             self.sim_tree = model[2][0]
             self.ph_tree = model[2][1]
+        else:
+            self.sim_tree = None
+            self.ph_tree = None
+
         if self.sim_tree != None:
             self.sections = [item[1] for item in self.sim_tree.sections.items()]
         else:
