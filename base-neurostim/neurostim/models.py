@@ -84,14 +84,14 @@ class CellModelTemplate():
         for sec in h.allsec():
             sec.insert('chanrhod')
 
-def L5_catV1():
+def L5_catV1_template(hoc_file, modelname):
     """
     Model code by Foutz et al 2012, Hu et al. 2009, ..., Mainen & Sejnowski 1996
     """
     # compile corresponding mod files
     # compile_mod_files('simneurostim/model/mod/foutz2012')
     # initialize model in NEURON
-    h.load_file('simneurostim/model/hoc/L5.hoc')
+    h.load_file(hoc_file)
     # use CellModelTemplate to define cell properties
     cell = CellModelTemplate(
             soma_xyz = [0,0,-1170], #um
@@ -102,8 +102,26 @@ def L5_catV1():
             insert_ChR=False,
             soma_sec='soma'
     )
-    cell.modelname = 'L5_catV1'
+    cell.modelname = modelname
     return cell, None, None
+
+def L5_catV1():
+    """
+    Original model by Foutz et al 2012, Hu et al. 2009, ..., Mainen & Sejnowski 1996
+    """
+    return L5_catV1_template('simneurostim/model/hoc/L5.hoc', 'L5_catV1')
+
+def L5_catV1_lowsodium():
+    return L5_catV1_template('simneurostim/model/hoc/L5dendlowsod50.hoc', 'L5_catV1_na50')
+
+def L5_catV1_highsodium():
+    return L5_catV1_template('simneurostim/model/hoc/L5dendhighsod150.hoc', 'L5_catV1_na150')
+
+def L5_catV1_lowleak():
+    return L5_catV1_template('simneurostim/model/hoc/L5dendlowleak50.hoc', 'L5_catV1_leak50')
+
+def L5_catV1_highleak():
+    return L5_catV1_template('simneurostim/model/hoc/L5dendhighleak150.hoc', 'L5_catV1_leak150')
 
 def L23_catV1():
     """

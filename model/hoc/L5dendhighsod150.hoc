@@ -210,7 +210,7 @@ proc  install_channels() {
     // see comment at top of this file 
     /************************/
 
-      gbar_na = gna12_dend*0.5    // 80*0.5 (added by Berling to account for lower sodium in dendrites
+      gbar_na = gna12_dend*1.5    // 80*1.5 (added by Berling to account for lower sodium in dendrites
       gbar_kv = gkv_dend        // 20
       gbar_km  = gkm            // 0.3
       gbar_kca = gkca           // 0.3
