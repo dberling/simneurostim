@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 from scipy.interpolate import interp1d
 
 ### functions for analysis where APC is fixed to desired value
@@ -260,6 +259,7 @@ def find_xAPCs_over_light_pwrs(df, longform=False, groupby=None, rad_label='radi
     return df
 
 def lineplot_x_APs_and_APC(paramsetdf,paramsetdf_long, ax=None, c1='tab:blue', c2='tab:red'):
+    import seaborn as sns
     if ax==None:
         fig, ax = plt.subplots(figsize=(8,4))
     ax = sns.lineplot(data=paramsetdf_long, x= 'light_power', y='radius [um]',
