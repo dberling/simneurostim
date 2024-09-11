@@ -150,10 +150,11 @@ def calc_rescaled_comp_conductances_nS(
     photon_flux_source_PER_fs = photon_flux_source_PER_s * 1e-15
     
     # load neuron comp data
-    secname, sec_x, transfer_resistance_MOhm, x, y, z, area_um2, channel_density_PERcm2 = comp_data.T
+    secname, sec_x, input_resistance_MOhm, transfer_resistance_MOhm, x, y, z, area_um2, channel_density_PERcm2 = comp_data.T
     # since conductance is given in nS, convert resistances to GOhm
+    input_resistance_GOhm = input_resistance_MOhm * 1e-3
     transfer_resistance_GOhm = transfer_resistance_MOhm * 1e-3
-    soma_input_resistance = transfer_resistance_GOhm[(secname==1) & (sec_x==0.5)].item()
+    #soma_input_resistance = input_resistance_GOhm[(secname==1) & (sec_x==0.5)].item()
     N_channel = area_um2 * 1e-8 * channel_density_PERcm2
     
     # load stimulator model
@@ -186,6 +187,6 @@ def calc_rescaled_comp_conductances_nS(
         sampling_period=interpol_dt_ms
     )
     comp_conductance_nS = channel_conductance_nS * np.array(N_channel).reshape((1,len(secname)))
-    rescaled_cond_nS = comp_conductance_nS / (1 + np.abs(np.array(transfer_resistance_GOhm).reshape((1,len(secname))) - soma_input_resistance) * comp_conductance_nS)
-    rescaled_cond_nS_scaled = comp_conductance_nS / (1 + np.abs(np.array(transfer_resistance_GOhm).reshape((1,len(secname))) * scale_imp - soma_input_resistance) * comp_conductance_nS)
-    return rescaled_cond_nS, rescaled_cond_nS_scaled, interpol_dt_ms, True
+    rescaled_cond_nS = comp_conductance_nS / (1 + np.abs(np.array(transfer_resistance_GOhm).reshape((1,len(secname))) - np.array(input_resistance_GOhm).reshape((1,len(secname)))) * comp_conductance_nS)
+    #rescaled_cond_nS_scaled = comp_conductance_nS / (1 + np.abs(np.array(transfer_resistance_GOhm).reshape((1,len(secname))) * scale_imp - soma_input_resistance) * comp_conductance_nS)
+    return rescaled_cond_nS, None, interpol_dt_ms, True
