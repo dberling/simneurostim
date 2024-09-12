@@ -112,7 +112,7 @@ def calc_rescaled_comp_conductances_nS(
     stimulator_config,
     comp_data, 
     temp_protocol,
-    scale_imp,
+    imp_diff,
     reject_if_sampling_smaller=0.001
 ):
     """
@@ -128,6 +128,9 @@ def calc_rescaled_comp_conductances_nS(
         data per compartment: secname, sec_x, transfer_resistance_MOhm, x, y, z, area_um2, channel_density_PERcm2
     temp_protocol: dict
         duration_ms: int, delay_ms: int, total_rec_time_ms: int
+    imp_diff = ['dd_ds', 'dd_ss', 'dd_mean(ds,ss)']
+        Whether impedance differense is calculated with transfer res. between
+        soma and dendrite, input res. at soma, or mean of both.
     reject_if_sampling_smaller: float
         If sampling period falls below this number, reject calculation.
 
@@ -154,7 +157,7 @@ def calc_rescaled_comp_conductances_nS(
     # since conductance is given in nS, convert resistances to GOhm
     input_resistance_GOhm = input_resistance_MOhm * 1e-3
     transfer_resistance_GOhm = transfer_resistance_MOhm * 1e-3
-    #soma_input_resistance = input_resistance_GOhm[(secname==1) & (sec_x==0.5)].item()
+    soma_input_resistance_GOhm = input_resistance_GOhm[(secname==1) & (sec_x==0.5)].item()
     N_channel = area_um2 * 1e-8 * channel_density_PERcm2
     
     # load stimulator model
@@ -187,6 +190,15 @@ def calc_rescaled_comp_conductances_nS(
         sampling_period=interpol_dt_ms
     )
     comp_conductance_nS = channel_conductance_nS * np.array(N_channel).reshape((1,len(secname)))
-    rescaled_cond_nS = comp_conductance_nS / (1 + np.abs(np.array(transfer_resistance_GOhm).reshape((1,len(secname))) - np.array(input_resistance_GOhm).reshape((1,len(secname)))) * comp_conductance_nS)
-    #rescaled_cond_nS_scaled = comp_conductance_nS / (1 + np.abs(np.array(transfer_resistance_GOhm).reshape((1,len(secname))) * scale_imp - soma_input_resistance) * comp_conductance_nS)
-    return rescaled_cond_nS, None, interpol_dt_ms, True
+    transfer_resistance_GOhm = np.array(transfer_resistance_GOhm).reshape((1,len(secname)))
+    input_resistance_GOhm = np.array(input_resistance_GOhm).reshape((1,len(secname)))
+    if imp_diff = 'dd_ds':
+        resistance_diff = np.abs(input_resistance_GOhm - transfer_resistance_GOhm)
+    elif imp_diff = 'dd_ss':
+        resistance_diff = np.abs(input_resistance_GOhm - soma_input_resistance_GOhm)
+    elif imp_diff = 'dd_mean(ds,ss)':
+        mean = (transfer_resistance_GOhm + soma_input_resistance) / 2
+        resistance_diff = np.abs(input_resistance_GOhm - mean)
+
+    rescaled_cond_nS = comp_conductance_nS / (1 + resistance_diff * comp_conductance_nS)
+    return rescaled_cond_nS, interpol_dt_ms, True
