@@ -197,7 +197,7 @@ def calc_rescaled_comp_conductances_nS(
     elif imp_diff == 'ss':
         resistance_diff = np.abs(input_resistance_GOhm - soma_input_resistance_GOhm)
     elif imp_diff == 'mean':
-        mean = (transfer_resistance_GOhm + soma_input_resistance) / 2
+        mean = (transfer_resistance_GOhm + soma_input_resistance_GOhm) / 2
         resistance_diff = np.abs(input_resistance_GOhm - mean)
 
     rescaled_cond_nS = comp_conductance_nS / (1 + resistance_diff * comp_conductance_nS)
