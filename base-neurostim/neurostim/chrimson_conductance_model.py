@@ -192,11 +192,11 @@ def calc_rescaled_comp_conductances_nS(
     comp_conductance_nS = channel_conductance_nS * np.array(N_channel).reshape((1,len(secname)))
     transfer_resistance_GOhm = np.array(transfer_resistance_GOhm).reshape((1,len(secname)))
     input_resistance_GOhm = np.array(input_resistance_GOhm).reshape((1,len(secname)))
-    if imp_diff = 'ds':
+    if imp_diff == 'ds':
         resistance_diff = np.abs(input_resistance_GOhm - transfer_resistance_GOhm)
-    elif imp_diff = 'ss':
+    elif imp_diff == 'ss':
         resistance_diff = np.abs(input_resistance_GOhm - soma_input_resistance_GOhm)
-    elif imp_diff = 'mean':
+    elif imp_diff == 'mean':
         mean = (transfer_resistance_GOhm + soma_input_resistance) / 2
         resistance_diff = np.abs(input_resistance_GOhm - mean)
 
