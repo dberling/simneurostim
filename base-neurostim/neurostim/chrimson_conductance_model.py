@@ -128,7 +128,7 @@ def calc_rescaled_comp_conductances_nS(
         data per compartment: secname, sec_x, transfer_resistance_MOhm, x, y, z, area_um2, channel_density_PERcm2
     temp_protocol: dict
         duration_ms: int, delay_ms: int, total_rec_time_ms: int
-    imp_diff = ['dd_ds', 'dd_ss', 'dd_mean(ds,ss)']
+    imp_diff = ['ds', 'ss', 'mean']
         Whether impedance differense is calculated with transfer res. between
         soma and dendrite, input res. at soma, or mean of both.
     reject_if_sampling_smaller: float
@@ -192,11 +192,11 @@ def calc_rescaled_comp_conductances_nS(
     comp_conductance_nS = channel_conductance_nS * np.array(N_channel).reshape((1,len(secname)))
     transfer_resistance_GOhm = np.array(transfer_resistance_GOhm).reshape((1,len(secname)))
     input_resistance_GOhm = np.array(input_resistance_GOhm).reshape((1,len(secname)))
-    if imp_diff = 'dd_ds':
+    if imp_diff = 'ds':
         resistance_diff = np.abs(input_resistance_GOhm - transfer_resistance_GOhm)
-    elif imp_diff = 'dd_ss':
+    elif imp_diff = 'ss':
         resistance_diff = np.abs(input_resistance_GOhm - soma_input_resistance_GOhm)
-    elif imp_diff = 'dd_mean(ds,ss)':
+    elif imp_diff = 'mean':
         mean = (transfer_resistance_GOhm + soma_input_resistance) / 2
         resistance_diff = np.abs(input_resistance_GOhm - mean)
 
