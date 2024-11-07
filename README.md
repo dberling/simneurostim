@@ -8,35 +8,11 @@ you_project/
     your_scripts/
     your_workflows/
 
-You can then follow the following steps to set up the simulation software:
-
-# install miniconda
-
-# create conda env from yml-file
-
-* run "conda env create -f environment.yml"
-
-# activate conda env
-
-* run "conda activate simneurostim"
-
-# compile mod files
-
-* run "nrnivmodl simneurostim/model/mod/"
-
-# add local python package via conda-develop
-
-* run "conda-develop simneurostim/base-neurostim/"
+# see https://github.com/CSNG-MFF/osmorph/ for software requirements
 
 # test installation:
 
 * run simulation_playground.ipynb and see if it runs without errors.
-
-# Errors due to separation of simulation & model code from this particular analysis
-
-Errors which might appear and how to fix:
-
-* old module name "optostim" may appear in code, replace by "neurostim"
 
 # References
 [1] https://www.neuron.yale.edu/neuron/
