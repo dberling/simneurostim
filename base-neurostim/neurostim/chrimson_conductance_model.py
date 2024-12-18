@@ -74,16 +74,17 @@ def calc_ChR_conductances_forloop(intensities, sampling_period):
         conds.append(channel_conductance_nS)
     return conds
     
-def calc_ChR_conductances_numpy(intensities, sampling_period):
+def calc_ChR_conductances_numpy(flux_photonsPERcm2_fs, sampling_period):
     """
+    Input: flux_photons/cm2/fs in shape: (n_times, n_channels)
     Returns single-channel Chrimson conductance in nS.
     """
     y0 = np.array([0., 0., 0.8, 0.2, 0.0]) 
-    y0 = np.tile(y0, (intensities.shape[1],1)).T
+    y0 = np.tile(y0, (flux_photonsPERcm2_fs.shape[1],1)).T
     
     channel_states = ChR_integration(
             y0=y0, 
-            intensities=intensities,
+            intensities=flux_photonsPERcm2_fs,
             sampling_period=sampling_period
         )
     O1 = channel_states[:,0,:]
@@ -97,12 +98,12 @@ def order_of_magnitude(number):
         return float('-inf')  # Logarithm of zero is undefined, return negative infinity
     return round(math.log10(abs(number)))
     
-def define_sampling(intensities):
+def define_sampling(flux_photonsPERcm2_fs):
     """
     Input flux in photons/cm2/fs, receive sampling_period in ms.
     """
     sampling_period = 0.1
-    int_max = np.max(intensities)
+    int_max = np.max(flux_photonsPERcm2_fs)
     if int_max > 1e3:
         sampling_period /= 10**(order_of_magnitude(int_max)) / 1e3
     return sampling_period
@@ -186,7 +187,7 @@ def calc_rescaled_comp_conductances_nS(
     fluxes_photons_PER_cm2_fs = [stimulation_times * flux for flux in fluxes_photons_PER_cm2_fs] 
     
     channel_conductance_nS = calc_ChR_conductances_numpy(
-        intensities=np.array(fluxes_photons_PER_cm2_fs).T, 
+        flux_photonsPERcm2_fs=np.array(fluxes_photons_PER_cm2_fs).T, 
         sampling_period=interpol_dt_ms
     )
     comp_conductance_nS = channel_conductance_nS * np.array(N_channel).reshape((1,len(secname)))

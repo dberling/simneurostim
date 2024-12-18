@@ -434,7 +434,7 @@ def calc_channel_cond_for_secs_and_flux_over_time(
     fluxes_photons_PER_cm2_fs = [stimulation_times * flux for flux in fluxes_photons_PER_cm2_fs]
     # calculate conductances
     channel_conductance_nS = calc_ChR_conductances_numpy(
-        intensities=np.array(fluxes_photons_PER_cm2_fs).T,
+        flux_photonsPERcm2_fs=np.array(fluxes_photons_PER_cm2_fs).T,
         sampling_period=interpol_dt_ms
     )
     return channel_conductance_nS, interpol_dt_ms, True
